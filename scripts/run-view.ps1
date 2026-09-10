@@ -4,6 +4,7 @@ param(
     [string]$View,
     [string]$Out,
     [string]$Svg,
+    [string]$Html,
     [string]$Layout,
     [string]$EmitLayout
 )
@@ -24,6 +25,7 @@ $argsList = @(
 if ($View) { $argsList += @('--view', $View) }
 if ($Out) { $argsList += @('--out', (Join-Path $script:RepoRoot $Out)) }
 if ($Svg) { $argsList += @('--svg', (Join-Path $script:RepoRoot $Svg)) }
+if ($Html) { $argsList += @('--html', (Join-Path $script:RepoRoot $Html)) }
 if ($Layout) { $argsList += @('--layout', (Join-Path $script:RepoRoot $Layout)) }
 if ($EmitLayout) { $argsList += @('--emit-layout', (Join-Path $script:RepoRoot $EmitLayout)) }
 

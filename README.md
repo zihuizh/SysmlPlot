@@ -39,6 +39,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1                        # 列出视图与诊断
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Out build\product.json
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Svg build\view.svg -EmitLayout build\view.layout.json
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Html build\view.html
 powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1                       # 探查用：元素、exposed、PlantUML/SVG
 ```
 
@@ -50,6 +51,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1                  
 
 渲染走同一个命令：`-Svg` 出图，`-EmitLayout` 落盘布局，`-Layout` 用既有布局重放
 （产物与布局一致时，重放结果与首次渲染逐字节相同）。
+`-Html` 输出自包含的交互式页面（平移、缩放、点选节点看属性、按来源过滤），可离线打开。
 
 ## 当前状态
 

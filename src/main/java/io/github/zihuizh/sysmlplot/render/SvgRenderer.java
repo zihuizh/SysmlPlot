@@ -34,25 +34,37 @@ public final class SvgRenderer {
     private static final int TEXT_PADDING = 20;
     private static final int MAX_LABEL_CHARS = 32;
 
-    /** 渲染结果：SVG 文本，以及本次实际使用的布局（可直接落盘为 layout.json）。 */
-    public record Result(String svg, Layout.LayoutFile layout) {
+    /**
+     * 渲染结果。
+     *
+     * @param svg        完整 SVG 文档（带 XML 声明），适合落盘
+     * @param svgElement 只有 svg 元素本身，适合内联进 HTML
+     * @param layout     本次实际使用的布局，可直接落盘为 layout.json
+     */
+    public record Result(String svg, String svgElement, Layout.LayoutFile layout) {
     }
 
     private SvgRenderer() {
     }
 
     public static Result render(ViewProduct.Product product, Layout.LayoutFile provided) {
-        List<ViewProduct.NodeRef> nodes = product.nodes();
+        Layout.LayoutFile layout = layoutFor(product, provided);
+        String element = toSvgElement(product, product.nodes(), layout);
+        return new Result("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + element, element, layout);
+    }
+
+    /**
+     * 决定本次使用哪份布局：外部布局必须与产物一致（`modelDigest`、`viewRef`、节点键集），
+     * 否则整体丢弃重算，不做部分复用（契约 6.1）。
+     */
+    public static Layout.LayoutFile layoutFor(ViewProduct.Product product, Layout.LayoutFile provided) {
         Map<String, ViewProduct.NodeRef> byId = new LinkedHashMap<>();
-        for (ViewProduct.NodeRef node : nodes) {
+        for (ViewProduct.NodeRef node : product.nodes()) {
             byId.put(node.id(), node);
         }
-
-        Layout.LayoutFile layout = isUsable(provided, product, byId)
+        return isUsable(provided, product, byId)
                 ? provided
-                : computeLayout(product, nodes, byId);
-
-        return new Result(toSvg(product, nodes, byId, layout), layout);
+                : computeLayout(product, product.nodes(), byId);
     }
 
     private static boolean isUsable(Layout.LayoutFile provided,
@@ -149,10 +161,9 @@ public final class SvgRenderer {
         return MARGIN + TITLE_BLOCK + reasons * REASON_LINE;
     }
 
-    private static String toSvg(ViewProduct.Product product,
-                                List<ViewProduct.NodeRef> nodes,
-                                Map<String, ViewProduct.NodeRef> byId,
-                                Layout.LayoutFile layout) {
+    private static String toSvgElement(ViewProduct.Product product,
+                                       List<ViewProduct.NodeRef> nodes,
+                                       Layout.LayoutFile layout) {
         double width = 0;
         double height = 0;
         for (Layout.Box box : layout.nodes().values()) {
@@ -163,7 +174,6 @@ public final class SvgRenderer {
         height += MARGIN;
 
         StringBuilder svg = new StringBuilder();
-        svg.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         svg.append(String.format(Locale.ROOT,
                 "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%.0f\" height=\"%.0f\" viewBox=\"0 0 %.0f %.0f\">\n",
                 width, height, width, height));
@@ -180,7 +190,8 @@ public final class SvgRenderer {
             reasonY += REASON_LINE;
         }
 
-        svg.append("  <g class=\"edges\">\n");
+        svg.append("  <g id=\"viewport\">\n");
+        svg.append("    <g class=\"edges\">\n");
         for (ViewProduct.RelationshipRef relationship : product.relationships()) {
             Layout.Box source = layout.nodes().get(relationship.source());
             Layout.Box target = layout.nodes().get(relationship.target());
@@ -193,12 +204,14 @@ public final class SvgRenderer {
             double y2 = target.y();
             double midY = (y1 + y2) / 2;
             svg.append(String.format(Locale.ROOT,
-                    "    <path class=\"edge %s\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f\"/>\n",
-                    escape(relationship.kind()), x1, y1, x1, midY, x2, midY, x2, y2));
+                    "      <path class=\"edge %s\" data-id=\"%s\" data-source=\"%s\" data-target=\"%s\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f\"/>\n",
+                    escape(relationship.kind()), escape(relationship.id()),
+                    escape(relationship.source()), escape(relationship.target()),
+                    x1, y1, x1, midY, x2, midY, x2, y2));
         }
-        svg.append("  </g>\n");
+        svg.append("    </g>\n");
 
-        svg.append("  <g class=\"nodes\">\n");
+        svg.append("    <g class=\"nodes\">\n");
         for (ViewProduct.NodeRef node : nodes) {
             Layout.Box box = layout.nodes().get(node.id());
             if (box == null) {
@@ -209,19 +222,22 @@ public final class SvgRenderer {
                 label = label.substring(0, MAX_LABEL_CHARS - 1) + "\u2026";
             }
             svg.append(String.format(Locale.ROOT,
-                    "    <g class=\"node %s origin-%s\" transform=\"translate(%.1f %.1f)\">\n",
-                    escape(node.graphic()), escape(node.origin()), box.x(), box.y()));
+                    "      <g class=\"node %s origin-%s\" data-id=\"%s\" data-ref=\"%s\" data-origin=\"%s\" transform=\"translate(%.1f %.1f)\">\n",
+                    escape(node.graphic()), escape(node.origin()),
+                    escape(node.id()), escape(node.ref()), escape(node.origin()),
+                    box.x(), box.y()));
             svg.append(String.format(Locale.ROOT,
-                    "      <rect class=\"box\" width=\"%.1f\" height=\"%.1f\" rx=\"4\"/>\n",
+                    "        <rect class=\"box\" width=\"%.1f\" height=\"%.1f\" rx=\"4\"/>\n",
                     box.width(), box.height()));
             svg.append(String.format(Locale.ROOT,
-                    "      <text class=\"name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                    "        <text class=\"name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
                     box.width() / 2, 17.0, escape(label)));
             svg.append(String.format(Locale.ROOT,
-                    "      <text class=\"meta\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                    "        <text class=\"meta\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
                     box.width() / 2, 32.0, escape(metaOf(node))));
-            svg.append("    </g>\n");
+            svg.append("      </g>\n");
         }
+        svg.append("    </g>\n");
         svg.append("  </g>\n");
         svg.append("</svg>\n");
         return svg.toString();

@@ -204,6 +204,25 @@ onSelect(nodeId | null)   → 语义引用       // 宿主据此做属性面板�
 - 不含时间戳、随机 id 或环境相关数据，因此**同一产物 + 同一布局 → SVG 逐字节一致**
 - 不完整时在左上角标出 `completeness.reasons`，但照常出图
 
+### 6.3 第二个实现：交互式 HTML 渲染器
+
+`render/HtmlRenderer` 输出一个**自包含**的 HTML（无 CDN、无外部字体、无脚本依赖，可离线打开），
+刻意复用 SVG 渲染器的图形与布局，只在上面加交互层——这样正好反过来检验契约：
+
+交互需要的东西是否都已经在产物里？结论是够用，且都有明确出处：
+
+| 交互 | 依赖的产物字段 |
+|---|---|
+| 选中与高亮 | `nodes[].id`（产物内稳定） |
+| 属性面板 | `ref` / `name` / `metaclass` / `graphic` / `origin` / `types` / `parent` |
+| 跳到源码 | `source.document` + `source.line` + `documents[].uri` |
+| 隐藏库/隐式元素 | `nodes[].origin` |
+| 关系列表 | `relationships[]`（含 `authored`） |
+
+交互层**没有**读取任何产物之外的语义，也没有从标签猜关系——契约的限制在这里得到了验证。
+检查器里展示的关系用名字（如 `containment → engine`）而不是内部 `id`，因为 `id` 只在一个产物内
+有效，不该暴露给人。
+
 ## 7. 版本与兼容
 
 - `schemaVersion` 递增表示字段语义有不兼容变化；新增可选字段视为兼容，不递增
