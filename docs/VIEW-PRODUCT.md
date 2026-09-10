@@ -51,8 +51,14 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `ref` | string | 视图的限定名，例如 `VehicleViews::'vehicle structure'` |
 | `name` | string? | 视图名 |
 | `definition` | string? | 视图定义名（`view def` 的名字） |
+| `kind` | string? | 视图类型，见下；`unclassified` 表示视图定义没有特化任何标准视图定义 |
 | `rendering` | string? | 模型里写的 rendering，例如 `asTreeDiagram` |
 | `source` | object? | 视图声明的位置，见 `source` 结构 |
+
+`kind` 取值：`general`、`interconnection`、`actionFlow`、`stateTransition`、`sequence`、
+`grid`、`browser`、`geometry`、`unclassified`。判定方式：沿视图定义的泛化闭包找
+`StandardViewDefinitions` 里的标准视图定义，从最具体的一个开始匹配（`ActionFlowView`
+特化 `InterconnectionView`，因此会判成 `actionFlow` 而不是 `interconnection`）。
 
 ### 2.2 `documents[]`
 
@@ -72,6 +78,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `metaclass` | string | 是 | 元类名，如 `PartUsage` |
 | `graphic` | string | 是 | 建议的图形类别，见第 3 节；只是提示，渲染器可覆盖 |
 | `origin` | string | 是 | `workspace` / `library` / `implicit` |
+| `placement` | string? | | `boundary` = 贴在父节点边界上的元素（端口）；缺省表示普通内部节点 |
 | `source` | object? | | 源码位置；`implicit` 元素没有 |
 | `parent` | string? | | 包含它的节点 id（如果有） |
 | `types` | string[]? | | 声明的类型名（`types` 原文，不做继承展开） |
@@ -91,7 +98,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | string | 产物内编号，形如 `r1` |
-| `kind` | string | `containment`（v0 只有这一种） |
+| `kind` | string | `containment` / `typing` / `specialization` / `subsetting` / `redefinition` |
 | `source` | string | 起点节点 id |
 | `target` | string | 终点节点 id |
 | `authored` | bool | `true` = 用户文本里写出来的；`false` = 由语义推导 |
@@ -127,8 +134,36 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `library` | 来自标准库等外部文件 |
 | `implicit` | 隐式生成，没有源码位置（如匿名多重性） |
 
-`relationship.kind`（v0）：只有 `containment`。后续计划加 `typing`、`specialization`、
-`subsetting`、`redefinition`、`satisfy`、`verify`、`flow`。
+`relationship.kind`：
+
+| 值 | 含义 | 目标端 |
+|---|---|---|
+| `containment` | 拥有关系（父子） | 子元素 |
+| `typing` | 用法被定义类型化（`: T`） | 类型定义 |
+| `specialization` | 特化（`:>`） | 泛化类型 |
+| `subsetting` | 子集化（`subsets`） | 被子集化的特征 |
+| `redefinition` | 重定义（`:>>`） | 被重定义的特征 |
+| `connection` | 连接（`connect` / connection usage） | 连接器的另一个端点 |
+
+出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
+补节点。四类语义关系只画文本里写出来的，隐式推导的不画；`containment` 两者都画，
+由 `authored` 如实标记。后续计划补 `satisfy`、`verify`、`allocate`、`flow`、`connection`。
+
+### 3.1 按视图类型的投影规则
+
+同一个暴露集合，不同 `kind` 的投影不同——这正是视图机制的意义：
+
+| 视图类型 | 投影差异 |
+|---|---|
+| `general` 及一切 `unclassified` | 所有暴露元素都是节点；连接器也是节点 |
+| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是 `connection` 边**；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
+
+端口贴在哪个节点上：优先端口属主本身（若已投影）；否则找"类型闭包包含该属主"的用法节点
+——`tank : Tank` 上的端口来自 `Tank`，在互联视图里画在 `tank` 的边界上。
+
+连接器端点解析：匿名端（`connect` 自动生成的 `source` / `target`）通过
+`Feature.getOwnedReferenceSubsetting()` 解析到真实特征；点路径走 `getChainingFeature()`
+取链尾。解析结果不在节点集时沿属主链上找。
 
 ## 4. 排序与编号
 

@@ -35,6 +35,12 @@
         "ref": { "type": "string", "minLength": 1 },
         "name": { "type": "string" },
         "definition": { "type": "string" },
+        "kind": {
+          "enum": [
+            "general", "interconnection", "actionFlow", "stateTransition",
+            "sequence", "grid", "browser", "geometry", "unclassified"
+          ]
+        },
         "rendering": { "type": "string" },
         "source": { "$ref": "#/$defs/sourceRef" }
       }
@@ -66,6 +72,10 @@
           ]
         },
         "origin": { "enum": ["workspace", "library", "implicit"] },
+        "placement": {
+          "description": "boundary = 贴在父节点边界上的元素（如端口）；缺省为内部节点",
+          "enum": ["interior", "boundary"]
+        },
         "source": { "$ref": "#/$defs/sourceRef" },
         "parent": { "type": "string", "pattern": "^n[0-9]+$" },
         "types": { "type": "array", "items": { "type": "string" } }
@@ -77,7 +87,9 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "pattern": "^r[0-9]+$" },
-        "kind": { "enum": ["containment"] },
+        "kind": {
+          "enum": ["containment", "typing", "specialization", "subsetting", "redefinition", "connection"]
+        },
         "source": { "type": "string", "pattern": "^n[0-9]+$" },
         "target": { "type": "string", "pattern": "^n[0-9]+$" },
         "authored": { "type": "boolean" }
