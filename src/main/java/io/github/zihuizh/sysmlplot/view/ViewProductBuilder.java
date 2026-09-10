@@ -61,6 +61,9 @@ public final class ViewProductBuilder {
     /** 这些视图类型按"嵌套结构 + 端口贴边界 + 连接器当边"投影。 */
     private static final Set<String> INTERCONNECTION_KINDS = Set.of("interconnection", "actionFlow", "stateTransition");
 
+    /** 源码片段的最大长度。 */
+    private static final int MAX_SNIPPET = 160;
+
     private ViewProductBuilder() {
     }
 
@@ -674,7 +677,34 @@ public final class ViewProductBuilder {
         if (documentId == null) {
             return null;
         }
-        return new ViewProduct.SourceRef(documentId, node.getStartLine(), node.getTotalOffset(), node.getTotalLength());
+        // 用 getOffset/getLength 而不是 getTotalOffset/getTotalLength：后者包含节点前面的隐藏
+        // token（注释、空白），会把上一行的注释也算进元素范围。
+        return new ViewProduct.SourceRef(documentId, node.getStartLine(), node.getOffset(),
+                node.getLength(), snippetOf(node));
+    }
+
+    /**
+     * 元素原文片段：折叠空白并截断，避免产物被大段文本撑开。
+     *
+     * <p>注意不能直接用 {@code node.getText()}：复合节点的 getText() 会连同隐藏子节点（注释、
+     * 空白）一起返回，而 getOffset()/getLength() 只覆盖元素本身，两者口径不一致。这里按
+     * offset/length 从文档原文里截取。
+     */
+    private static String snippetOf(INode node) {
+        INode root = node.getRootNode();
+        if (root == null) {
+            return null;
+        }
+        String document = root.getText();
+        int from = Math.min(node.getOffset(), document.length());
+        int to = Math.min(from + node.getLength(), document.length());
+        String collapsed = document.substring(from, to).replaceAll("\\s+", " ").trim();
+        if (collapsed.isEmpty()) {
+            return null;
+        }
+        return collapsed.length() <= MAX_SNIPPET
+                ? collapsed
+                : collapsed.substring(0, MAX_SNIPPET - 1) + "\u2026";
     }
 
     private static String originOf(SysMLWorkspace workspace, Element element, ViewProduct.SourceRef source) {

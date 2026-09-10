@@ -12,8 +12,12 @@ public final class ViewProduct {
 
     public static final int SCHEMA_VERSION = 0;
 
-    /** 源码位置。{@code line} 从 1 开始，{@code offset} 为文档内字符偏移。 */
-    public record SourceRef(int document, int line, int offset, int length) {
+    /**
+     * 源码位置。{@code line} 从 1 开始，{@code offset} 为文档内字符偏移；
+     * {@code snippet} 是元素的原文片段（空白已折叠、超长已截断），便于宿主在不读文件的情况下
+     * 展示来源。
+     */
+    public record SourceRef(int document, int line, int offset, int length, String snippet) {
     }
 
     public record DocumentRef(int id, String uri, boolean workspace) {

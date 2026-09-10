@@ -24,11 +24,12 @@
 注：Action Flow 与 State Transition 在标准库里特化自 InterconnectionView，目前判定为各自的
 `kind` 但投影走 interconnection 规则；两者的专有节点/边规则尚未实现。
 
-### 3. 仓格与源码联动（部分完成）
+### 3. 仓格与源码联动 ✅（已完成）
 
-- ✅ **仓格**：`nodes[].compartments` 已实现（标题规则与排序对齐官方 `VCompartment`），
-  覆盖 `parameters` / `attributes` / `values` 等
-- ❌ **源码联动**：点击节点跳到源码（现在只显示文档与行号）；需要宿主侧提供打开编辑器的能力
+- ✅ **仓格**：`nodes[].compartments`，标题规则与排序对齐官方 `VCompartment`
+- ✅ **源码联动（单向）**：`source.snippet` 带原文片段，交互式页面里可显示来源并跳转编辑器
+  （`vscode://file/<path>:<line>`）
+- ❌ **反向联动**：编辑器光标位置驱动图上高亮，需要编辑器宿主（VS Code 扩展或 LSP 客户端）
 - ❌ 仓格里的 `documentation`（doc 文本）尚未收入；官方在 `VCompartment.addDocumentation` 里
   有专门处理，doc 通常占用节点下方的独立区域
 

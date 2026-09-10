@@ -228,6 +228,25 @@ Default  Tree  State  Interconnection  Action  Sequence  Case  MIXED
 实测样例 `samples/parameters`：`Focus`/`Shoot` 出 `parameters`（`in scene: Scene`、
 `out image: Image`，顺序与方向均正确），`Settings` 同时出 `attributes` 与 `values`。
 
+## 源码位置的坑（2026-09-10 补充）
+
+Xtext 的 `INode` 有两个口径，用错会把上一行的注释算进元素范围：
+
+- `getTotalOffset()` / `getTotalLength()`：包含节点前面的隐藏 token（注释、空白）
+- `getOffset()` / `getLength()`：只覆盖元素本身
+
+而且**即使换成后者，`node.getText()` 仍会带上隐藏子节点**——复合节点的 `getText()` 返回覆盖
+全部子节点（含隐藏）的文本，与 `getOffset()/getLength()` 口径不一致。实测 `Focus` 的
+`line=8` 但片段里带着第 7 行的 `// 注释`。
+
+可靠做法是按 offset/length 从根节点原文里截取：
+
+```java
+INode root = node.getRootNode();
+String document = root.getText();
+String text = document.substring(node.getOffset(), node.getOffset() + node.getLength());
+```
+
 ## 语义诊断（已完成）
 
 `SysMLInteractive.validate()` 只校验它自己的"当前资源"，而正规加载路径（`readAll`）不设当前
