@@ -1,0 +1,111 @@
+#!/bin/sh
+# SysmlPlot pre-commit hook
+# 规则见 docs/DEVELOPMENT.md。只做能自动判定的检查，语义问题交给人和测试。
+
+set -u
+
+repo_root=$(git rev-parse --show-toplevel) || exit 1
+cd "$repo_root" || exit 1
+
+fail=0
+say() { printf '  %s\n' "$1"; }
+ok()  { printf '  [ok] %s\n' "$1"; }
+bad() { printf '  [x]  %s\n' "$1"; fail=1; }
+
+printf '==> SysmlPlot pre-commit\n'
+
+list=$(mktemp) || exit 1
+trap 'rm -f "$list"' EXIT
+git diff --cached --name-only --diff-filter=ACM >"$list"
+
+if [ ! -s "$list" ]; then
+    ok '没有暂存文件，跳过检查'
+    exit 0
+fi
+
+# --- 1. 禁止的路径与文件类型 ------------------------------------------------
+blocked_dir='^(build|out|target|dist|node_modules|\.gradle|\.idea)/'
+blocked_ext='\.(jar|class|exe|dll|so|dylib|war|ear|zip|7z|tar|tgz|gz|bin|pdb)$'
+path_bad=0
+while IFS= read -r f; do
+    if [ "$f" = 'local.env.ps1' ]; then
+        bad "本地环境文件不应提交: $f"
+        path_bad=1
+        continue
+    fi
+    if printf '%s' "$f" | grep -Eq "$blocked_dir"; then
+        bad "不允许提交构建产物目录: $f"
+        path_bad=1
+        continue
+    fi
+    if printf '%s' "$f" | grep -Eqi "$blocked_ext"; then
+        bad "不允许提交二进制或归档文件: $f"
+        path_bad=1
+    fi
+done <"$list"
+[ "$path_bad" -eq 0 ] && ok '路径与文件类型检查通过'
+
+# --- 2. 单文件大小 ----------------------------------------------------------
+max_kb=${SYMLPLOT_MAX_FILE_KB:-2048}
+size_bad=0
+while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    size=$(wc -c <"$f" | tr -d ' ')
+    if [ "$size" -gt $((max_kb * 1024)) ]; then
+        bad "文件过大（$((size / 1024)) KB > ${max_kb} KB）: $f"
+        size_bad=1
+    fi
+done <"$list"
+[ "$size_bad" -eq 0 ] && ok "单文件大小检查通过（上限 ${max_kb} KB）"
+
+# --- 3. 样例模型校验 --------------------------------------------------------
+find_java21() {
+    if [ -n "${SYMLPLOT_JAVA_HOME:-}" ] && [ -x "$SYMLPLOT_JAVA_HOME/bin/java" ]; then
+        printf '%s\n' "$SYMLPLOT_JAVA_HOME/bin/java"
+        return 0
+    fi
+    for home in '/c/Program Files/Android/Android Studio/jbr' '/c/01-Programs/03-Tools/JabRef/runtime'; do
+        [ -x "$home/bin/java" ] || continue
+        if "$home/bin/java" -version 2>&1 | head -n 1 | grep -Eq 'version "2[1-9]'; then
+            printf '%s\n' "$home/bin/java"
+            return 0
+        fi
+    done
+    if command -v java >/dev/null 2>&1; then
+        if java -version 2>&1 | head -n 1 | grep -Eq 'version "2[1-9]'; then
+            command -v java
+            return 0
+        fi
+    fi
+    return 1
+}
+
+if grep -Eq '^samples/.*\.(sysml|kerml)$' "$list"; then
+    oracle_jar=${SYMLPLOT_ORACLE_JAR:-/d/03-Work/MBSE/Code2Model-Auto/tools/sysmlv2tool-dist/sysmlv2-tool-fat.jar}
+    lib_dir=${SYMLPLOT_LIBDIR:-/d/03-Work/MBSE/Code2Model-Auto/tools/sysmlv2tool-dist/sysml.library}
+    log_file=${TMPDIR:-/tmp}/sysmlplot-validate.log
+    java_bin=$(find_java21 || true)
+
+    if [ -z "$java_bin" ] || [ ! -f "$oracle_jar" ]; then
+        say '跳过样例校验：未找到 Java 21 或官方解析器工具'
+        say '可设置 SYMLPLOT_JAVA_HOME / SYMLPLOT_ORACLE_JAR / SYMLPLOT_LIBDIR 启用'
+    else
+        say '用官方解析器校验 samples/ ...'
+        if "$java_bin" -jar "$oracle_jar" --libdir "$lib_dir" validate samples >"$log_file" 2>&1; then
+            ok '样例通过官方解析器校验'
+        else
+            bad '样例未通过官方解析器校验'
+            sed 's/^/      /' "$log_file" | tail -n 40
+            say "完整输出：$log_file"
+        fi
+    fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+    printf '\n提交被阻止。规则见 docs/DEVELOPMENT.md，紧急情况可 git commit --no-verify。\n'
+    exit 1
+fi
+
+printf '==> 检查通过\n'
+exit 0
+
