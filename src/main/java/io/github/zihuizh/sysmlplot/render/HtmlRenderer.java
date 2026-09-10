@@ -66,7 +66,7 @@ public final class HtmlRenderer {
 
     private static List<String> documentUris(ViewProduct.Product product) {
         return product.documents().stream()
-                .map(document -> document.id() + " " + document.uri())
+                .map(ViewProduct.DocumentRef::uri)
                 .toList();
     }
 
@@ -127,6 +127,13 @@ public final class HtmlRenderer {
               aside dd { margin: 0; word-break: break-all; }
               aside .hint { color: #888; }
               aside .section { margin-top: 12px; }
+              aside .snippet { background: #f6f8fa; border: 1px solid #e5e5e5; border-radius: 4px;
+                               padding: 6px 8px; font-size: 11px; margin: 8px 0 0;
+                               white-space: pre-wrap; word-break: break-word; }
+              aside .editor-link { display: inline-block; margin-top: 10px; color: #1a73e8;
+                                   text-decoration: none; }
+              aside .source-path { color: #888; font-size: 11px; margin-top: 2px;
+                                   word-break: break-all; }
               .node.selected .box { stroke: #1a73e8; stroke-width: 2; }
             </style>
             </head>
@@ -265,11 +272,29 @@ public final class HtmlRenderer {
                 row(rows, '类型', (node.types || []).join(', '));
                 row(rows, '父节点', node.parent);
                 if (node.source) {
-                  row(rows, '位置', '文档 ' + node.source.document + ' 第 ' + node.source.line + ' 行');
-                  row(rows, '文档', documentUris[node.source.document]);
+                  row(rows, '位置', '第 ' + node.source.line + ' 行');
                 }
                 rows.forEach(function (cell) { list.appendChild(cell); });
                 inspector.appendChild(list);
+
+                if (node.source) {
+                  var uri = documentUris[node.source.document];
+                  var link = document.createElement('a');
+                  link.className = 'editor-link';
+                  link.href = editorUri(uri, node.source.line);
+                  link.textContent = '在编辑器中打开';
+                  var pathText = document.createElement('div');
+                  pathText.className = 'source-path';
+                  pathText.textContent = uri;
+                  inspector.appendChild(link);
+                  inspector.appendChild(pathText);
+                  if (node.source.snippet) {
+                    var snippet = document.createElement('pre');
+                    snippet.className = 'snippet';
+                    snippet.textContent = node.source.snippet;
+                    inspector.appendChild(snippet);
+                  }
+                }
 
                 var section = document.createElement('div');
                 section.className = 'section';
@@ -309,6 +334,11 @@ public final class HtmlRenderer {
                   var hide = hidden[path.dataset.source] || hidden[path.dataset.target];
                   path.style.display = hide ? 'none' : '';
                 });
+              }
+
+              function editorUri(uri, line) {
+                var path = uri.split('file://').join('');
+                return 'vscode://file/' + path + ':' + line;
               }
 
               document.getElementById('fit').addEventListener('click', fit);

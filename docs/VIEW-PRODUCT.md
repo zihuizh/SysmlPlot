@@ -117,9 +117,13 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 **排序**（同样对齐官方）：参数优先且按 `in` → `out` → `inout`；然后按元类名；最后按名字。
 仓格之间按标题字典序。类型名在仓格里用简单名（与官方 PUML 输出一致），精确引用放条目的 `ref`。
 
-`source` 结构：`{ "document": int, "line": int, "offset": int, "length": int }`，
+`source` 结构：`{ "document": int, "line": int, "offset": int, "length": int, "snippet": string? }`，
 `line` 从 1 开始，`offset` 是文档内字符偏移。`length` 是元素的文本范围，**包含其子元素**，
 因此父节点的范围比它自己的名字长得多；只要起始位置即可定位。
+
+`snippet` 是元素原文的片段（空白折叠为单空格、超过 160 字符截断并加省略号），让宿主不必读文件
+就能展示来源。**范围与片段都不包含元素前面的注释与空白**——实测 Xtext 节点的
+`getTotalOffset()` 会把上一行的注释算进来，因此这里用 `getOffset()` / `getLength()`。
 
 文档 `uri` 采用标准的 `file:///…` 形式（EMF 默认输出的 `file:/…` 已被规范化）。
 
