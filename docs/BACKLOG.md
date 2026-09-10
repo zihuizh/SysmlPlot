@@ -29,6 +29,22 @@
 - 节点上显示属性的仓格（attributes / ports / values / doc），目前只有名字 + 图形类别
 - 点击节点跳到源码（现在只显示文档与行号）；需要宿主侧提供打开编辑器的能力
 
+参考：Pilot 的 `org.omg.sysml.plantuml.VCompartment`（649 行）是官方仓格内容规则的实现，
+可作为条目归类与排版的参照（同样只能借规则、不能借代码）。
+
+### 4. 端口方向（新）
+
+互联视图里端口目前只有位置，没有方向。Pilot 的 `VComposite.isPortOut()` 用"是否为连接器
+第一个 owned end feature"判定 `portin` / `portout`（官方注释承认该判据是权宜之计）。
+需要决定我们采用什么判据，并在产物里给端口加方向字段（如 `direction: in/out/inout`）。
+
+更可靠的方向来源是端口特征自身的方向（`in` / `out` / `inout` 有向特征），优先级应高于端序推断。
+
+### 5. 逐视图对照 oracle（新）
+
+`scripts/run-spike.ps1 -Puml "<view>"` 已能调用官方渲染。可以对同一视图比较"官方画了哪些
+节点和边"与我们的产物，比只对 exposed 集合比较更严格。
+
 ## 阶段 2/3 的已知项
 
 | 项 | 说明 |

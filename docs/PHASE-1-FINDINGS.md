@@ -167,6 +167,45 @@ ActionFlowView, StateTransitionView, …}`。`view 'x' : InterconnectionView { �
 exposed 从 18 个降到 6 个（隐式多重性、库元素、conjugated port definition 都被挡掉），
 视图立刻可读。这再次说明视图可用性主要取决于 filter。
 
+## Pilot 自带的按视图渲染（2026-09-10 补充）
+
+`org.omg.sysml.plantuml` 模块（29 个类）是官方按视图类型渲染的实现，是本项目
+**投影规则的权威参照**。`SysML2PlantUMLText.MODE` 定义了 8 种口径：
+
+```text
+Default  Tree  State  Interconnection  Action  Sequence  Case  MIXED
+```
+
+模式到渲染类的映射（`SysML2PlantUMLText` 内）：
+
+| 模式 | 类 | 对应本项目的 `view.kind` |
+|---|---|---|
+| `Tree`（Default） | `VTree` | `general` |
+| `Interconnection` | `VComposite` | `interconnection` |
+| `State` | `VStateMachine` | `stateTransition` |
+| `Action` | `VAction` / `VBehavior` | `actionFlow` |
+| `Sequence` | `VSequence` | `sequence` |
+| `Case` | `VCase` | 尚无对应 |
+
+横向模块：`Visitor`（遍历与分派基类）、`VPath`（特征链与连接解析）、`VCompartment`
+（仓格内容规则）、`SysML2PlantUMLStyle`（样式）。`SysMLInteractive.view()` 会把模型里
+写的 rendering 名映射到模式：`asTreeDiagram` → `TREE`、`asInterconnectionDiagram` →
+`INTERCONNECTION`。
+
+值得借鉴的具体规则：
+
+- **端口方向**：`VComposite.isPortOut()` 把端口画成 `portin` / `portout`，判据是"该端口是否为
+  连接器的第一个 owned end feature"。源码注释明确指出这是权宜之计——用关系自身 source 判断
+  对 ItemFlowEnd 不可靠且低效，所以暂时按端序判定。
+- **composite 模式不画 succession**（`caseSuccession` 返回空）。
+- **仓格**的完整规则在 `VCompartment`。
+
+**不能复用代码**：它生成 PlantUML 文本，规则与 PlantUML 语法纠缠（`addPUMLLine`、
+`insert(pt, "portout ")`），抽不出中性图表示。所以是借规则不借代码。
+
+**一个对比**：Pilot 的 Tree 模式只画包含关系（实测 `-Puml` 输出仅有 `E1 *-- E2` 形态的
+组合边）。我们已实现的五类语义边超出了它自带渲染的范围，这部分没有现成参照，需按规范判定。
+
 ## 语义诊断（已完成）
 
 `SysMLInteractive.validate()` 只校验它自己的"当前资源"，而正规加载路径（`readAll`）不设当前
