@@ -51,6 +51,14 @@ D:\03-Work\MBSE\Code2Model-Auto\tools\sysmlv2tool-dist\sysml.library
 
 ## 四、对照工具（不是我们的产品，只作为行为参照）
 
+PNG 导出用的无头浏览器（`scripts/render-png.ps1`）：本机 Chrome 与 Edge 都在，脚本按
+Chrome → Edge 顺序探测，可用 `SYMLPLOT_BROWSER` 覆盖。两个实测到的坑：
+
+1. **必须给独立的 `--user-data-dir`**：本机已有 Chrome 实例时，新进程会把命令转发给旧实例后
+   立刻退出，截图可能不落盘；
+2. **两次调用不能共用同一个 profile 目录**，会锁冲突导致第二次失败——所以脚本每次用随机目录
+   并在结束时清理。
+
 ```text
 D:\03-Work\MBSE\Code2Model-Auto\tools\sysmlv2tool-dist\sysmlv2-tool-fat.jar
 ```
