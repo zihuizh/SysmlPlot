@@ -44,6 +44,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1                  
 powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1                     # 与官方渲染做差分验证
 powershell -ExecutionPolicy Bypass -File scripts\render-png.ps1 -View "VehicleViews::'vehicle structure'" -Out build\view.png
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "StructureViews::'structure (parts)'" -Workspace samples/structure -At "samples\structure\model\StructureModel.sysml:20:20"
+powershell -ExecutionPolicy Bypass -File scripts\serve-view.ps1 -Workspace samples/structure -View "StructureViews::'structure (parts)'" -Port 8765
 ```
 
 可加 `-Puml "<view 限定名>"` 输出 PlantUML，或用 `-Svg "<view 限定名>" -Out build\view.svg`

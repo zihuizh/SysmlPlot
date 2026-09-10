@@ -19,6 +19,7 @@ import io.github.zihuizh.sysmlplot.render.Layout;
 import io.github.zihuizh.sysmlplot.render.SvgRenderer;
 import io.github.zihuizh.sysmlplot.view.ViewProduct;
 import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
+import io.github.zihuizh.sysmlplot.view.SourceLookup;
 
 /**
  * 命令行入口。
@@ -32,6 +33,7 @@ import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
  *        [--layout &lt;file&gt;]     使用既有布局
  *        [--emit-layout &lt;file&gt;] 输出本次使用的布局
  *        [--at &lt;path:line[:col]&gt;] 反查：源码位置落在哪些节点范围内（最内层在前）
+ *        [--serve &lt;port&gt;]      启动本地预览服务（交互式页面 + /cursor 光标通道）
  * </pre>
  *
  * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
@@ -56,6 +58,7 @@ public final class Main {
         Path layoutOut = null;
         String viewRef = null;
         String at = null;
+        Integer servePort = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -68,6 +71,7 @@ public final class Main {
                 case "--layout" -> layoutIn = Path.of(args[++i]);
                 case "--emit-layout" -> layoutOut = Path.of(args[++i]);
                 case "--at" -> at = args[++i];
+                case "--serve" -> servePort = Integer.parseInt(args[++i]);
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -100,6 +104,15 @@ public final class Main {
         }
 
         ViewProduct.Product product = ViewProductBuilder.build(workspace, target);
+
+        if (servePort != null) {
+            String pageHtml = HtmlRenderer.render(product);
+            PreviewServer.start(servePort, pageHtml, product, workspace.workspaceRoot());
+            // 服务跑在后台线程上，主线程阻塞住，Ctrl+C 结束
+            while (true) {
+                Thread.sleep(60_000L);
+            }
+        }
 
         if (at != null) {
             printNodesAt(product, workspace.workspaceRoot(), at);
@@ -151,64 +164,8 @@ public final class Main {
      * 位置格式：{@code <path>:<line>[:<col>]}，路径可绝对或相对工作区，列从 1 开始、缺省为 1。
      */
     private static void printNodesAt(ViewProduct.Product product, Path workspaceRoot, String at) throws Exception {
-        String[] parts = at.split(":");
-        if (parts.length < 2) {
-            throw new IllegalArgumentException("--at 需要 <path>:<line>[:<col>]");
-        }
-        boolean hasColumn = isNumber(parts[parts.length - 1]) && isNumber(parts[parts.length - 2]);
-        int line;
-        int column = 1;
-        int pathEnd = parts.length - 1;
-        if (hasColumn) {
-            line = Integer.parseInt(parts[parts.length - 2]);
-            column = Integer.parseInt(parts[parts.length - 1]);
-            pathEnd = parts.length - 3;
-        } else {
-            line = Integer.parseInt(parts[parts.length - 1]);
-            pathEnd = parts.length - 2;
-        }
-        String pathText = String.join(":", java.util.Arrays.copyOfRange(parts, 0, pathEnd + 1));
-        Path file = Path.of(pathText);
-        if (!file.isAbsolute()) {
-            // 相对路径先按工作区根解析，再退回当前目录——两种写法都常见。
-            Path fromWorkspace = workspaceRoot.resolve(pathText).toAbsolutePath().normalize();
-            Path fromCwd = file.toAbsolutePath().normalize();
-            file = java.nio.file.Files.exists(fromWorkspace) ? fromWorkspace : fromCwd;
-        } else {
-            file = file.toAbsolutePath().normalize();
-        }
-        if (!java.nio.file.Files.exists(file)) {
-            throw new IllegalArgumentException("file not found: " + file);
-        }
-
-        String text = java.nio.file.Files.readString(file, java.nio.charset.StandardCharsets.UTF_8);
-        String[] lines = text.split("\n", -1);
-        if (line < 1 || line > lines.length) {
-            throw new IllegalArgumentException("line out of range: " + line);
-        }
-        int offset = 0;
-        for (int i = 0; i < line - 1; i++) {
-            offset += lines[i].length() + 1;
-        }
-        offset += Math.max(0, column - 1);
-
-        List<ViewProduct.NodeRef> matches = new java.util.ArrayList<>();
-        for (ViewProduct.NodeRef node : product.nodes()) {
-            ViewProduct.SourceRef source = node.source();
-            if (source == null) {
-                continue;
-            }
-            ViewProduct.DocumentRef document = product.documents().get(source.document());
-            if (!sameFile(document.uri(), file)) {
-                continue;
-            }
-            if (offset >= source.offset() && offset < source.offset() + source.length()) {
-                matches.add(node);
-            }
-        }
-        matches.sort(java.util.Comparator.comparingInt(node -> node.source().length()));
-
-        System.out.printf("[at] %s:%d:%d%n", pathText, line, column);
+        List<ViewProduct.NodeRef> matches = SourceLookup.nodesAt(product, workspaceRoot, at);
+        System.out.printf("[at] %s%n", at);
         if (matches.isEmpty()) {
             System.out.println("  (没有节点覆盖该位置)");
             return;
@@ -221,30 +178,6 @@ public final class Main {
                     node.source().line(),
                     node.source().length());
         }
-    }
-
-    private static boolean isNumber(String value) {
-        if (value.isEmpty()) {
-            return false;
-        }
-        for (int i = 0; i < value.length(); i++) {
-            if (!Character.isDigit(value.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** 比较产物里的文档 URI 与本地文件路径是否指向同一个文件。 */
-    private static boolean sameFile(String uri, Path file) {
-        String path = uri;
-        for (String prefix : new String[] {"file:///", "file://", "file:/"}) {
-            if (path.startsWith(prefix)) {
-                path = path.substring(prefix.length());
-                break;
-            }
-        }
-        return path.replace('/', '\\').equalsIgnoreCase(file.toString());
     }
 
     private static void write(Path path, String content) throws Exception {
