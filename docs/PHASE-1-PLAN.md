@@ -53,6 +53,10 @@ General View。
 
 ## 5. 产物契约（草案 v0）
 
+> 状态：已定稿，见 `docs/VIEW-PRODUCT.md` 与 `schema/view-product.schema.json`。
+> 与下面草案的差异：去掉了 `elementId`（Pilot 每次加载生成随机 UUID，不可复现）；
+> 排序规则改为 `限定名 → 元类 → 源码偏移 → 暴露顺序`。
+
 一个 view 一次生成一个产物，字段至少包括：
 
 ```json
