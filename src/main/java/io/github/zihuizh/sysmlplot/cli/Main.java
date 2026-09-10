@@ -14,6 +14,7 @@ import org.omg.sysml.lang.sysml.RenderingUsage;
 import org.omg.sysml.lang.sysml.ViewUsage;
 
 import io.github.zihuizh.sysmlplot.engine.SysMLWorkspace;
+import io.github.zihuizh.sysmlplot.render.HtmlRenderer;
 import io.github.zihuizh.sysmlplot.render.Layout;
 import io.github.zihuizh.sysmlplot.render.SvgRenderer;
 import io.github.zihuizh.sysmlplot.view.ViewProduct;
@@ -27,6 +28,7 @@ import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
  * Main --libdir &lt;sysml.library&gt; --workspace &lt;dir&gt; --view &lt;ref&gt;     生成视图产物
  *        [--out &lt;file&gt;]        产物写文件（默认 stdout）
  *        [--svg &lt;file&gt;]        渲染 SVG
+ *        [--html &lt;file&gt;]       渲染自包含的交互式 HTML
  *        [--layout &lt;file&gt;]     使用既有布局
  *        [--emit-layout &lt;file&gt;] 输出本次使用的布局
  * </pre>
@@ -48,6 +50,7 @@ public final class Main {
         Path workspaceDir = null;
         Path out = null;
         Path svg = null;
+        Path html = null;
         Path layoutIn = null;
         Path layoutOut = null;
         String viewRef = null;
@@ -59,6 +62,7 @@ public final class Main {
                 case "--view" -> viewRef = args[++i];
                 case "--out" -> out = Path.of(args[++i]);
                 case "--svg" -> svg = Path.of(args[++i]);
+                case "--html" -> html = Path.of(args[++i]);
                 case "--layout" -> layoutIn = Path.of(args[++i]);
                 case "--emit-layout" -> layoutOut = Path.of(args[++i]);
                 default -> {
@@ -95,7 +99,7 @@ public final class Main {
         ViewProduct.Product product = ViewProductBuilder.build(workspace, target);
         String json = GSON.toJson(product) + "\n";
         if (out == null) {
-            if (svg == null) {
+            if (svg == null && html == null) {
                 System.out.println(json);
             }
         } else {
@@ -103,7 +107,7 @@ public final class Main {
             System.out.println("[product] written to " + out.toAbsolutePath());
         }
 
-        if (svg != null || layoutOut != null) {
+        if (svg != null || html != null || layoutOut != null) {
             Layout.LayoutFile provided = layoutIn == null ? null : readLayout(layoutIn);
             SvgRenderer.Result rendered = SvgRenderer.render(product, provided);
             if (layoutOut != null) {
@@ -113,6 +117,10 @@ public final class Main {
             if (svg != null) {
                 write(svg, rendered.svg());
                 System.out.println("[svg] written to " + svg.toAbsolutePath());
+            }
+            if (html != null) {
+                write(html, HtmlRenderer.render(product, provided));
+                System.out.println("[html] written to " + html.toAbsolutePath());
             }
         }
     }
