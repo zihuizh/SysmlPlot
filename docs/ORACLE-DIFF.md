@@ -30,7 +30,7 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 
 ## 当前结果（2026-09-10）
 
-四个样例的节点名集合**全部一致**，无 missing：
+七个样例视图的节点名集合**全部一致**，无 missing：
 
 | 样例 | 官方节点 | 我方节点 | 官方边 | 我方边 |
 |---|---:|---:|---:|---:|
@@ -38,6 +38,13 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 | structure / parts | 10 | 10 | 18 | 13 |
 | interconnection / power | 5 | 5 | 5 | 3 |
 | parameters / values | 6 | 7 | 0 | 4 |
+| expose / membership（`expose vehicle;`） | 4 | 4 | 2 | 3 |
+| expose / namespace（`expose ExposeModel::*;`） | 6 | 6 | 4 | 5 |
+| expose / recursive（`expose vehicle::**;`） | 4 | 4 | 2 | 3 |
+
+后三个样例（`samples/expose-forms`）同时覆盖**视图定义继承**：filter 写在 `Structure Base`
+上，三个视图都用派生的 `Structure Derived`，实测条件被正确继承（隐式多重性、库元素都没有
+混进来），`view.kind` 也沿泛化闭包判定为 `general`。
 
 ## 已知差异及其原因
 

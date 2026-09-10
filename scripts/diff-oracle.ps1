@@ -8,6 +8,9 @@ $cases = @(
     @{ Workspace = 'samples/structure';      View = "StructureViews::'structure (parts)'";       Label = 'structure / parts' },
     @{ Workspace = 'samples/interconnection'; View = "PowerViews::'power interconnection'";       Label = 'interconnection / power' },
     @{ Workspace = 'samples/parameters';     View = "ParamViews::'parameters and values'";       Label = 'parameters / values' }
+    @{ Workspace = 'samples/expose-forms';   View = "ExposeViews::membership";                    Label = 'expose / membership' }
+    @{ Workspace = 'samples/expose-forms';   View = "ExposeViews::namespace";                     Label = 'expose / namespace' }
+    @{ Workspace = 'samples/expose-forms';   View = "ExposeViews::recursive";                     Label = 'expose / recursive' }
 )
 
 $scratch = Join-Path $script:BuildDir 'oracle-diff'

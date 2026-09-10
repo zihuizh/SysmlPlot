@@ -41,6 +41,7 @@
 - ✅ General + Interconnection 视图
 - ✅ 属性面板（交互式页面的检查器）
 - ✅ 暴露范围：`expose` 求值（官方实现）+ 递归展开自有结构特征 + 视图定义泛化闭包判定类型
+- ✅ `expose` 三种形式（成员 / 命名空间 / 递归）与视图定义继承：样例 `samples/expose-forms`，纳入差分验证
 - ✅ 与 OMG Pilot 的差分验证（`scripts/diff-oracle.ps1`，结论见 `docs/ORACLE-DIFF.md`）
 - ✅ SVG 导出
 - ❌ 模型浏览器（大纲树）
