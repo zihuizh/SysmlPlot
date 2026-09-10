@@ -308,6 +308,18 @@ onSelect(nodeId | null)   → 语义引用       // 宿主据此做属性面板�
 检查器里展示的关系用名字（如 `containment → engine`）而不是内部 `id`，因为 `id` 只在一个产物内
 有效，不该暴露给人。
 
+交互能力（同样只依赖产物字段）：
+
+| 能力 | 依赖的产物字段 |
+|---|---|
+| 模型大纲（按包含关系还原成树，点击选中并居中） | `nodes[].parent` / `name` / `placement` |
+| 拖动节点（边界元素随所属节点移动） | `nodes[].placement` / `parent` |
+| 拖动后重算连线 | `relationships[].source/target` |
+| 导出布局（面板里给出 layout JSON） | `modelDigest` / `view.ref` / 布局对象 |
+
+导出的布局可以另存为 `layout.json`，再用 `-Layout` 载入重放。闭环**已实测**：自动布局时
+`n3` 在 `(206,184)`，手工改成 `(406,284)` 后重放，渲染结果与之一致。
+
 ## 7. 版本与兼容
 
 - `schemaVersion` 递增表示字段语义有不兼容变化；新增可选字段视为兼容，不递增

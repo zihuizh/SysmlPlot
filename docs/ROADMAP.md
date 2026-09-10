@@ -45,9 +45,9 @@
 - ✅ 与 OMG Pilot 的差分验证（`scripts/diff-oracle.ps1`，结论见 `docs/ORACLE-DIFF.md`）
 - ✅ SVG 导出
 - ✅ PNG 导出（`scripts/render-png.ps1`：SVG + 无头浏览器光栅化，支持 `-Scale`）
-- ❌ 模型浏览器（大纲树）
+- ✅ 模型浏览器（交互式页面左侧大纲树，点击选中并居中）
 - ❌ 源码双向定位的反向一半（编辑器光标驱动图上高亮，需要编辑器宿主）
-- ❌ 手工调整布局并独立保存
+- ✅ 手工调整布局并独立保存（拖动节点 → 导出 layout.json → `-Layout` 重放，闭环已实测）
 - ❌ 与 SysON 的差分验证（SysON 为 Docker 部署，启动成本高，优先级低于 Pilot）
 
 ## 阶段 3 · 工程化
