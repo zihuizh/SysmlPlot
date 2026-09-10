@@ -85,6 +85,14 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 `flows` 样例里官方既画了粗点线边，又在 `powerSystem` 的 `##//allocations//##` 仓格里写了
 `noname connect logical to board`。我们只画边（连接类特征不进仓格），避免同一事实出现两次。
 
+**7. 我们把继承端口里的有向特征也多物化了一层。**
+
+`interconnection` 样例里我们比官方多画了 `fuelSupply`（端口 `outlet`/`inlet` 的类型
+`FuelOutPort`/`FuelInPort` 里的有向项）。规则差异：官方遍历"暴露元素 + 其继承端口"，
+端口**内部**的有向特征只在被显式暴露（或 `::**` 递归到）时才画；我们多走了一层——继承端口的
+类型闭包里的有向特征也会物化。这样端口上能看到载荷特征，代价是比官方多几个小框。
+`extra` 属于需要人判断的一类，这里判定为可接受。
+
 ## 与 SysON 的差分
 
 `scripts/diff-syson.py` 做同样的事，只是对照对象换成 SysON（它跑在本机 Docker 里：
