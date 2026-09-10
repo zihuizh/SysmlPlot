@@ -28,6 +28,7 @@ import org.omg.sysml.lang.sysml.FlowUsage;
 import org.omg.sysml.lang.sysml.ItemUsage;
 import org.omg.sysml.lang.sysml.ActorMembership;
 import org.omg.sysml.lang.sysml.ActionUsage;
+import org.omg.sysml.lang.sysml.AllocationUsage;
 import org.omg.sysml.lang.sysml.ObjectiveMembership;
 import org.omg.sysml.lang.sysml.OccurrenceUsage;
 import org.omg.sysml.lang.sysml.OwningMembership;
@@ -87,7 +88,8 @@ public final class ViewProductBuilder {
         // 暴露范围不只是 exposed 本身。官方渲染会往已暴露元素的内部走：把其中的结构特征
         // （部件、端口、有向特征等）也画成框。这里对齐该行为，见契约第 3.2 节。
         boolean[] truncated = {false};
-        List<Element> scope = expandScope(exposed, truncated);
+        List<Element> collectedConnectors = new ArrayList<>();
+        List<Element> scope = expandScope(workspace, exposed, truncated, collectedConnectors);
 
         // 暴露顺序本身是稳定的，作为匿名元素之间的最后一级排序依据。
         Map<Element, Integer> exposureOrder = new LinkedHashMap<>();
@@ -110,12 +112,16 @@ public final class ViewProductBuilder {
         boolean interconnectionLike = INTERCONNECTION_KINDS.contains(kind);
 
         // 互联类视图里，连接器不是节点（它要变成边），连接器自己的端也不是节点。
-        List<Element> connectors = new ArrayList<>();
+        List<Element> connectors = new ArrayList<>(collectedConnectors);
         List<Element> projected = new ArrayList<>();
         for (Element element : scope) {
-            if (interconnectionLike && isConnector(element)) {
-                connectors.add(element);
-                continue;
+            if (isConnector(element)) {
+                if (!connectors.contains(element)) {
+                    connectors.add(element);
+                }
+                if (interconnectionLike) {
+                    continue;
+                }
             }
             if (interconnectionLike && ownedByConnector(element)) {
                 continue;
@@ -165,7 +171,10 @@ public final class ViewProductBuilder {
      *
      * <p>数据特征（无方向的属性、值）不进来，它们以仓格形式呈现。
      */
-    private static List<Element> expandScope(List<Element> exposed, boolean[] truncated) {
+    private static List<Element> expandScope(SysMLWorkspace workspace,
+                                             List<Element> exposed,
+                                             boolean[] truncated,
+                                             List<Element> connectors) {
         List<Element> scope = new ArrayList<>(exposed);
         Set<Element> seen = new LinkedHashSet<>(exposed);
         Deque<Element> queue = new ArrayDeque<>(exposed);
@@ -174,7 +183,19 @@ public final class ViewProductBuilder {
             if (!(current instanceof Type type)) {
                 continue;
             }
+            // 队列里的元素本身也要补继承来的端口/有向特征：
+            // 端口 `outlet : FuelOutPort` 的 `fuelSupply` 就是这样进来的。
+            if (current instanceof Feature currentFeature) {
+                addInheritedPorts(workspace, currentFeature, scope, seen, queue);
+            }
             for (Feature feature : type.getOwnedFeature()) {
+                // 连接器不进节点集，但要收集起来——它们在互联类视图里是边。
+                if (isConnectorFeature(feature)) {
+                    if (!connectors.contains(feature)) {
+                        connectors.add(feature);
+                    }
+                    continue;
+                }
                 if (!isStructuralFeature(feature) || !seen.add(feature)) {
                     continue;
                 }
@@ -184,9 +205,51 @@ public final class ViewProductBuilder {
                 }
                 scope.add(feature);
                 queue.add(feature);
+                // 官方的渲染会把"从类型继承来的端口"也画在用法上（PUML 里标 `^`），照此补齐。
+                addInheritedPorts(workspace, feature, scope, seen, queue);
             }
         }
         return scope;
+    }
+
+    /** 把类型闭包里的端口与有向特征补进范围——它们属于定义，但画在用法上。 */
+    private static void addInheritedPorts(SysMLWorkspace workspace,
+                                          Feature feature,
+                                          List<Element> scope,
+                                          Set<Element> seen,
+                                          Deque<Element> queue) {
+        Set<Type> visited = new HashSet<>();
+        Deque<Type> types = new ArrayDeque<>(feature.getType());
+        while (!types.isEmpty()) {
+            Type type = types.poll();
+            if (type == null || !visited.add(type)) {
+                continue;
+            }
+            // 只展开用户模型里的类型：库类型（如 Ports::Port）自带的 ownedPorts / subports
+            // 属于基础设施，不是模型内容，官方渲染也不会画。
+            if (!workspace.isWorkspaceResource(type.eResource())) {
+                continue;
+            }
+            for (Feature owned : type.getOwnedFeature()) {
+                if (!isPortOrDirected(owned) || !seen.add(owned)) {
+                    continue;
+                }
+                scope.add(owned);
+                queue.add(owned);
+            }
+            for (Specialization specialization : type.getOwnedSpecialization()) {
+                types.add(specialization.getGeneral());
+            }
+        }
+    }
+
+    private static boolean isPortOrDirected(Feature feature) {
+        return feature instanceof PortUsage || feature.getDirection() != null;
+    }
+
+    /** 会变成边的连接类特征。 */
+    private static boolean isConnectorFeature(Feature feature) {
+        return feature instanceof ConnectionUsage || feature instanceof FlowUsage;
     }
 
     /** 结构特征 = 会画成框的东西；连接器除外（由投影决定它是边还是仓格条目）。 */
@@ -652,7 +715,7 @@ public final class ViewProductBuilder {
                 String sourceId = nodeIdFor(resolveConnectorEnd(ends.get(0), 0), nodeIds);
                 String targetId = nodeIdFor(resolveConnectorEnd(ends.get(1), 0), nodeIds);
                 if (sourceId != null && targetId != null) {
-                    addEdge(edges, new Edge("connection", sourceId, targetId, true));
+                    addEdge(edges, new Edge(connectorKind(element), sourceId, targetId, true));
                 }
             }
         }
@@ -672,6 +735,19 @@ public final class ViewProductBuilder {
                     "r" + (i + 1), edge.kind(), edge.source(), edge.target(), edge.authored()));
         }
         return relationships;
+    }
+
+    /**
+     * 连接类元素的边类型：分配、流，其余按普通连接处理。
+     */
+    private static String connectorKind(Element element) {
+        if (element instanceof AllocationUsage) {
+            return "allocate";
+        }
+        if (element instanceof FlowUsage) {
+            return "flow";
+        }
+        return "connection";
     }
 
     /**

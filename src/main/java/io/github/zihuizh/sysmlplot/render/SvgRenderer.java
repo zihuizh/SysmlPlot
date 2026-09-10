@@ -1,6 +1,7 @@
 package io.github.zihuizh.sysmlplot.render;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -139,10 +140,16 @@ public final class SvgRenderer {
         // 边界元素（端口）不参与树布局，贴在父节点的左边界上依次排开。
         Map<String, Integer> boundaryIndex = new LinkedHashMap<>();
         double orphanCursor = 0;
+        // 边界元素之间也会嵌套（端口上的载荷特征挂在端口上），必须按嵌套深度从外到内摆，
+        // 否则内层元素在父元素定位之前就被处理，只能退化到画布角落。
+        List<ViewProduct.NodeRef> boundaryNodes = new ArrayList<>();
         for (ViewProduct.NodeRef node : nodes) {
-            if (!isBoundary(node)) {
-                continue;
+            if (isBoundary(node)) {
+                boundaryNodes.add(node);
             }
+        }
+        boundaryNodes.sort(Comparator.comparingInt(node -> boundaryDepth(node, byId)));
+        for (ViewProduct.NodeRef node : boundaryNodes) {
             Layout.Box parentBox = boxes.get(node.parent());
             double size = PORT_SIZE;
             if (parentBox == null) {
@@ -179,6 +186,17 @@ public final class SvgRenderer {
         }
         return new Layout.LayoutFile(Layout.SCHEMA_VERSION, product.modelDigest(),
                 product.view().ref(), boxes);
+    }
+
+    /** 边界元素的嵌套深度（父链长度），用于保证外层先定位。 */
+    private static int boundaryDepth(ViewProduct.NodeRef node, Map<String, ViewProduct.NodeRef> byId) {
+        int depth = 0;
+        String parent = node.parent();
+        while (parent != null && byId.containsKey(parent) && depth < 16) {
+            depth++;
+            parent = byId.get(parent).parent();
+        }
+        return depth;
     }
 
     private static boolean isBoundary(ViewProduct.NodeRef node) {
