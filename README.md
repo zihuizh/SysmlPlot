@@ -36,11 +36,16 @@ powershell -ExecutionPolicy Bypass -File scripts/install-hooks.ps1
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
-powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1                        # 列出视图与诊断
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Out build\product.json
+powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1                       # 探查用：元素、exposed、PlantUML/SVG
 ```
 
 可加 `-Puml "<view 限定名>"` 输出 PlantUML，或用 `-Svg "<view 限定名>" -Out build\view.svg`
 导出 SVG。当前结论见 `docs/PHASE-1-FINDINGS.md`。
+
+视图产物的契约见 `docs/VIEW-PRODUCT.md`，机器可读 schema 见
+`schema/view-product.schema.json`（可用 `python -m jsonschema` 校验产物）。
 
 ## 当前状态
 

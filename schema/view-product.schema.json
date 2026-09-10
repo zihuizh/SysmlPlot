@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zihuizh/SysmlPlot/schema/view-product.schema.json",
+  "title": "SysmlPlot view product",
+  "description": "一个 view 的语义投影产物。契约说明见 docs/VIEW-PRODUCT.md。",
+  "type": "object",
+  "required": ["schemaVersion", "modelDigest", "view", "documents", "nodes", "relationships", "completeness"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 0 },
+    "modelDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "view": { "$ref": "#/$defs/view" },
+    "documents": { "type": "array", "items": { "$ref": "#/$defs/document" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } },
+    "completeness": { "$ref": "#/$defs/completeness" }
+  },
+  "$defs": {
+    "sourceRef": {
+      "type": "object",
+      "required": ["document", "line", "offset", "length"],
+      "additionalProperties": false,
+      "properties": {
+        "document": { "type": "integer", "minimum": 0 },
+        "line": { "type": "integer", "minimum": 1 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "length": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "view": {
+      "type": "object",
+      "required": ["ref"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "definition": { "type": "string" },
+        "rendering": { "type": "string" },
+        "source": { "$ref": "#/$defs/sourceRef" }
+      }
+    },
+    "document": {
+      "type": "object",
+      "required": ["id", "uri", "workspace"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "uri": { "type": "string", "minLength": 1 },
+        "workspace": { "type": "boolean" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "metaclass", "graphic", "origin"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^n[0-9]+$" },
+        "ref": { "type": "string" },
+        "name": { "type": "string" },
+        "metaclass": { "type": "string", "minLength": 1 },
+        "graphic": {
+          "enum": [
+            "package", "part", "attribute", "item", "port", "action", "state",
+            "requirement", "enumeration", "connection", "interface", "flow",
+            "multiplicity", "documentation", "other"
+          ]
+        },
+        "origin": { "enum": ["workspace", "library", "implicit"] },
+        "source": { "$ref": "#/$defs/sourceRef" },
+        "parent": { "type": "string", "pattern": "^n[0-9]+$" },
+        "types": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "required": ["id", "kind", "source", "target", "authored"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^r[0-9]+$" },
+        "kind": { "enum": ["containment"] },
+        "source": { "type": "string", "pattern": "^n[0-9]+$" },
+        "target": { "type": "string", "pattern": "^n[0-9]+$" },
+        "authored": { "type": "boolean" }
+      }
+    },
+    "completeness": {
+      "type": "object",
+      "required": ["complete", "reasons"],
+      "additionalProperties": false,
+      "properties": {
+        "complete": { "type": "boolean" },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "detail"],
+            "additionalProperties": false,
+            "properties": {
+              "code": { "type": "string", "minLength": 1 },
+              "detail": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

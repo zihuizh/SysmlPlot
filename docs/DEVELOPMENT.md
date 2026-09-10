@@ -48,6 +48,7 @@ SysmlPlot/
   README.md
   SYSML-VIEW-TOOL-FEASIBILITY.md     立项评估（历史文档，不随代码演进而改写结论）
   docs/                              规划、方案、环境事实、规范
+  schema/                            产物的机器可读契约（JSON Schema）
   samples/<案例>/{model,views}/        SysML v2 样例，按输入文件角色分目录
   scripts/                           构建、运行、校验脚本
   src/main/java/                     工具源码
