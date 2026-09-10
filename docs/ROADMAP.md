@@ -38,12 +38,16 @@
 
 ## 阶段 2 · 可用 MVP
 
-- 补齐 `expose` 的各类形式与视图定义继承
-- General + Interconnection 视图
-- 模型浏览器、属性面板、源码双向定位
-- 手工调整布局并独立保存
-- SVG / PNG 导出
-- 与 OMG Pilot、SysON 的差分验证
+- ✅ General + Interconnection 视图
+- ✅ 属性面板（交互式页面的检查器）
+- ✅ 暴露范围：`expose` 求值（官方实现）+ 递归展开自有结构特征 + 视图定义泛化闭包判定类型
+- ✅ 与 OMG Pilot 的差分验证（`scripts/diff-oracle.ps1`，结论见 `docs/ORACLE-DIFF.md`）
+- ✅ SVG 导出
+- ❌ 模型浏览器（大纲树）
+- ❌ 源码双向定位的反向一半（编辑器光标驱动图上高亮，需要编辑器宿主）
+- ❌ 手工调整布局并独立保存
+- ❌ PNG 导出
+- ❌ 与 SysON 的差分验证（SysON 为 Docker 部署，启动成本高，优先级低于 Pilot）
 
 ## 阶段 3 · 工程化
 

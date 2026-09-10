@@ -41,6 +41,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleView
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Svg build\view.svg -EmitLayout build\view.layout.json
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Html build\view.html
 powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1                       # 探查用：元素、exposed、PlantUML/SVG
+powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1                     # 与官方渲染做差分验证
 ```
 
 可加 `-Puml "<view 限定名>"` 输出 PlantUML，或用 `-Svg "<view 限定名>" -Out build\view.svg`
