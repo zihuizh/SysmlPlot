@@ -206,6 +206,28 @@ Default  Tree  State  Interconnection  Action  Sequence  Case  MIXED
 **一个对比**：Pilot 的 Tree 模式只画包含关系（实测 `-Puml` 输出仅有 `E1 *-- E2` 形态的
 组合边）。我们已实现的五类语义边超出了它自带渲染的范围，这部分没有现成参照，需按规范判定。
 
+## 仓格规则的来源（2026-09-10 补充）
+
+仓格不是"固定几个筐"，官方实现（`VCompartment` + `CompartmentEntry`）的做法是：
+**把元素自有的成员逐条列出来，按标题分组**，标题由成员关系的类型推导——
+`FeatureValue` → `values`，有方向的 → `parameters`，`Subject/Actor/Stakeholder/ObjectiveMembership`
+各有专名，`BindingConnector`/`FlowUsage`/`SuccessionFlowUsage` 分别叫
+`bindings`/`flows`/`succession flows`，其余按元类名去后缀、拆驼峰、复数化
+（`AttributeUsage` → `attributes`）。
+
+排序链（`CompartmentEntry.compareTo`）：成员关系元类名 → 参数优先且按方向 ordinal →
+特征元类（`AttributeUsage` 优先）→ 名字。
+
+两个实现要点：
+
+1. **值不在 `ownedFeature` 里**：`attribute mass : Real = 1500;` 的 `FeatureValue`
+   挂在**特征自己**的 `ownedRelationship` 上，顺着元素的 `ownedFeature` 找是找不到的；
+2. **别重复画**：已经作为节点（部件、端口）或已变成边（连接器）的成员不能再进仓格，
+   否则同一个元素会以两种形态同时出现。
+
+实测样例 `samples/parameters`：`Focus`/`Shoot` 出 `parameters`（`in scene: Scene`、
+`out image: Image`，顺序与方向均正确），`Settings` 同时出 `attributes` 与 `values`。
+
 ## 语义诊断（已完成）
 
 `SysMLInteractive.validate()` 只校验它自己的"当前资源"，而正规加载路径（`readAll`）不设当前

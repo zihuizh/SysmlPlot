@@ -6,7 +6,7 @@ package VehicleModel {
     part def Transmission;
 
     part vehicle : Vehicle {
-        attribute mass : Real;
+        attribute mass : Real = 1500;
         part engine : Engine {
             attribute power : Real;
         }

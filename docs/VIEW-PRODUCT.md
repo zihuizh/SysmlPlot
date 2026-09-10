@@ -82,10 +82,40 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `source` | object? | | 源码位置；`implicit` 元素没有 |
 | `parent` | string? | | 包含它的节点 id（如果有） |
 | `types` | string[]? | | 声明的类型名（`types` 原文，不做继承展开） |
+| `compartments` | array? | | 仓格内容，见 2.3.1 |
 
 **不含 `elementId`**：实测 Pilot 每次加载都会为元素重新生成随机 UUID，同一个模型两次运行得到的
 `elementId` 完全不同，因此它既不能作为稳定身份，也不能进入产物（否则产物不可复现）。
 跨工具对齐需要作者在文本里显式声明 id，属于后续议题。
+
+#### 2.3.1 仓格（compartments）
+
+```json
+"compartments": [
+  { "title": "parameters", "entries": [ { "text": "scene: Scene", "direction": "in" } ] }
+]
+```
+
+条目字段：`text`（必填，形如 `name: Type`）、`ref`（限定名）、`direction`（`in`/`out`/`inout`）、
+`inherited`。
+
+**收哪些**：元素自有的特征，外加挂在特征上的值（`= 表达式`）。两条排除规则：
+
+1. **已经作为节点画出来的不再收**——部件、端口已经是框，不能同时在仓格里再列一遍；
+2. **已经变成边的连接器不再收**（互联类视图里）。
+
+**标题规则**（照搬官方渲染实现 `org.omg.sysml.plantuml.CompartmentEntry.getTitle()`）：
+
+| 条件 | 标题 |
+|---|---|
+| 值（`FeatureValue` 成员） | `values` |
+| `SubjectMembership` / `ActorMembership` / `StakeholderMembership` / `ObjectiveMembership` | `subject` / `actors` / `stakeholders` / `objectives` |
+| 带方向的特征 | `parameters` |
+| `BindingConnector` / `FlowUsage` / `SuccessionFlowUsage` | `bindings` / `flows` / `succession flows` |
+| 其余 | 元类名去 `Usage`/`Definition` 后缀、拆驼峰、复数化，如 `AttributeUsage` → `attributes` |
+
+**排序**（同样对齐官方）：参数优先且按 `in` → `out` → `inout`；然后按元类名；最后按名字。
+仓格之间按标题字典序。类型名在仓格里用简单名（与官方 PUML 输出一致），精确引用放条目的 `ref`。
 
 `source` 结构：`{ "document": int, "line": int, "offset": int, "length": int }`，
 `line` 从 1 开始，`offset` 是文档内字符偏移。`length` 是元素的文本范围，**包含其子元素**，
