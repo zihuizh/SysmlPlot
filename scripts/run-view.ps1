@@ -2,7 +2,10 @@
 param(
     [string]$Workspace = 'samples/vehicle',
     [string]$View,
-    [string]$Out
+    [string]$Out,
+    [string]$Svg,
+    [string]$Layout,
+    [string]$EmitLayout
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,6 +23,9 @@ $argsList = @(
 )
 if ($View) { $argsList += @('--view', $View) }
 if ($Out) { $argsList += @('--out', (Join-Path $script:RepoRoot $Out)) }
+if ($Svg) { $argsList += @('--svg', (Join-Path $script:RepoRoot $Svg)) }
+if ($Layout) { $argsList += @('--layout', (Join-Path $script:RepoRoot $Layout)) }
+if ($EmitLayout) { $argsList += @('--emit-layout', (Join-Path $script:RepoRoot $EmitLayout)) }
 
 $result = Invoke-NativeCommand -Exe $script:JavaExe -Arguments $argsList
 $result.Output | ForEach-Object { Write-Host $_ }
