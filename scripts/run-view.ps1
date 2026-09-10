@@ -6,7 +6,8 @@ param(
     [string]$Svg,
     [string]$Html,
     [string]$Layout,
-    [string]$EmitLayout
+    [string]$EmitLayout,
+    [string]$At
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +35,7 @@ if ($Svg) { $argsList += @('--svg', (Resolve-OutPath $Svg)) }
 if ($Html) { $argsList += @('--html', (Resolve-OutPath $Html)) }
 if ($Layout) { $argsList += @('--layout', (Resolve-OutPath $Layout)) }
 if ($EmitLayout) { $argsList += @('--emit-layout', (Resolve-OutPath $EmitLayout)) }
+if ($At) { $argsList += @('--at', $At) }
 
 $result = Invoke-NativeCommand -Exe $script:JavaExe -Arguments $argsList
 $result.Output | ForEach-Object { Write-Host $_ }
