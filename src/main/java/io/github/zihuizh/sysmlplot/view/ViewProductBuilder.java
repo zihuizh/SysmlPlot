@@ -40,6 +40,7 @@ import org.omg.sysml.lang.sysml.RenderingUsage;
 import org.omg.sysml.lang.sysml.Specialization;
 import org.omg.sysml.lang.sysml.StakeholderMembership;
 import org.omg.sysml.lang.sysml.StateUsage;
+import org.omg.sysml.lang.sysml.SatisfyRequirementUsage;
 import org.omg.sysml.lang.sysml.SubjectMembership;
 import org.omg.sysml.lang.sysml.Subsetting;
 import org.omg.sysml.lang.sysml.SuccessionFlowUsage;
@@ -190,7 +191,8 @@ public final class ViewProductBuilder {
 
     /** 结构特征 = 会画成框的东西；连接器除外（由投影决定它是边还是仓格条目）。 */
     private static boolean isStructuralFeature(Feature feature) {
-        if (feature instanceof ConnectionUsage || feature instanceof BindingConnector) {
+        if (feature instanceof ConnectionUsage || feature instanceof BindingConnector
+                || feature instanceof SatisfyRequirementUsage) {
             return false;
         }
         if (feature.getDirection() != null) {
@@ -414,6 +416,7 @@ public final class ViewProductBuilder {
         features.removeIf(nodeIds::containsKey);
         features.removeIf(connectors::contains);
         features.removeIf(Feature::isEnd);
+        features.removeIf(SatisfyRequirementUsage.class::isInstance);
         features.sort(Comparator
                 .comparing((Feature feature) -> feature.getDirection() == null ? 1 : 0)
                 .thenComparing(feature -> feature.getDirection() == null
@@ -654,6 +657,8 @@ public final class ViewProductBuilder {
             }
         }
 
+        collectSatisfyEdges(nodeIds, edges);
+
         List<Edge> sorted = new ArrayList<>(edges.values());
         sorted.sort(Comparator
                 .comparing(Edge::kind)
@@ -667,6 +672,32 @@ public final class ViewProductBuilder {
                     "r" + (i + 1), edge.kind(), edge.source(), edge.target(), edge.authored()));
         }
         return relationships;
+    }
+
+    /**
+     * `satisfy` 边：由满足方（`satisfyingFeature`，缺省是承载 satisfy 的那个元素）指向被满足的需求。
+     *
+     * <p>`satisfy X;` 语句本身是满足方的自有特征，官方渲染把它画成带 `«satisfy»` 标签的边而不是
+     * 节点；我们对齐该行为，因此这类特征也不进仓格。
+     */
+    private static void collectSatisfyEdges(Map<Element, String> nodeIds, Map<String, Edge> edges) {
+        for (Map.Entry<Element, String> entry : nodeIds.entrySet()) {
+            if (!(entry.getKey() instanceof Type type)) {
+                continue;
+            }
+            for (Feature feature : type.getOwnedFeature()) {
+                if (!(feature instanceof SatisfyRequirementUsage satisfy)) {
+                    continue;
+                }
+                Element satisfying = satisfy.getSatisfyingFeature() != null ? satisfy.getSatisfyingFeature() : type;
+                String sourceId = nodeIdFor(satisfying, nodeIds);
+                String targetId = nodeIdFor(satisfy.getSatisfiedRequirement(), nodeIds);
+                if (sourceId != null && targetId != null) {
+                    boolean authored = NodeModelUtils.findActualNodeFor(satisfy) != null;
+                    addEdge(edges, new Edge("satisfy", sourceId, targetId, authored));
+                }
+            }
+        }
     }
 
     /** 把连接器端解析到真实特征：匿名端走 reference subsetting，点路径走特征链。 */

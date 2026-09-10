@@ -11,6 +11,7 @@ $cases = @(
     @{ Workspace = 'samples/expose-forms';   View = "ExposeViews::membership";                    Label = 'expose / membership' }
     @{ Workspace = 'samples/expose-forms';   View = "ExposeViews::namespace";                     Label = 'expose / namespace' }
     @{ Workspace = 'samples/expose-forms';   View = "ExposeViews::recursive";                     Label = 'expose / recursive' }
+    @{ Workspace = 'samples/requirements';   View = "RequirementsViews::'requirement trace'";     Label = 'requirements / satisfy' }
 )
 
 $scratch = Join-Path $script:BuildDir 'oracle-diff'

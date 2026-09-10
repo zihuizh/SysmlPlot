@@ -29,6 +29,8 @@ public final class SvgRenderer {
     private static final double PORT_SIZE = 18;
     /** 边界元素标签画在方块左侧，预留的宽度（用于避免整体越界）。 */
     private static final double PORT_LABEL_ALLOWANCE = 44;
+    /** 需要画标签的边类型；包含/类型/特化/子集化/重定义这类结构边不加标签（会糊成一片）。 */
+    private static final Set<String> LABELLED_EDGE_KINDS = Set.of("satisfy", "verify", "allocate", "flow");
     private static final double LINE_HEIGHT = 14;
     private static final double COMPARTMENT_PAD = 6;
     private static final double H_GAP = 72;
@@ -305,6 +307,11 @@ public final class SvgRenderer {
                     escape(relationship.kind()), escape(relationship.id()),
                     escape(relationship.source()), escape(relationship.target()),
                     x1, y1, x1, midY, x2, midY, x2, y2));
+            if (LABELLED_EDGE_KINDS.contains(relationship.kind())) {
+                svg.append(String.format(Locale.ROOT,
+                        "      <text class=\"edge-label\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                        (x1 + x2) / 2, midY - 4.0, escape("\u00ab" + relationship.kind() + "\u00bb")));
+            }
         }
         svg.append("    </g>\n");
 
@@ -396,6 +403,7 @@ public final class SvgRenderer {
                     .edge.specialization { stroke-dasharray: 9 3 2 3; }
                     .edge.subsetting { stroke-dasharray: 2 3; }
                     .edge.redefinition { stroke-dasharray: 9 2 2 2 2 2; }
+                    .edge.satisfy { stroke-dasharray: 6 4; }
                     .node .box { fill: #fff; stroke: #444; stroke-width: 1.2; }
                     .node .name { font-family: sans-serif; font-size: 13px; fill: #111; text-anchor: middle; }
                     .node .meta { font-family: sans-serif; font-size: 10px; fill: #777; text-anchor: middle; }
@@ -406,6 +414,7 @@ public final class SvgRenderer {
                     .compartment-separator { stroke: #e0e0e0; stroke-width: 1; }
                     .compartment-title { font-family: sans-serif; font-size: 9px; fill: #999; }
                     .compartment-entry { font-family: sans-serif; font-size: 11px; fill: #333; }
+                    .edge-label { font-family: sans-serif; font-size: 10px; fill: #666; text-anchor: middle; }
                   </style>
                 """;
     }
