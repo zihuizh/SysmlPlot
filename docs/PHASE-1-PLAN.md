@@ -97,3 +97,7 @@ General View。
 2. 打印：解析诊断、包与元素清单、找到的 view 清单
 3. 确认 Pilot API 的入口与所需最小依赖集合
 4. 把这套启动方式固化成 `scripts/` 下的构建与运行脚本
+
+**状态：已完成（2026-09-10）**，结论与实测数据见 `docs/PHASE-1-FINDINGS.md`。
+主要修正：视图求值不需要我们自己实现——官方 `ViewUsage.getExposedElement()` 已经同时
+应用了 expose 与 filter；工作区必须用 `readAll` 加载而不是 `next()/parse()`。

@@ -1,4 +1,4 @@
-# 为当前仓库启用版本化的 Git 钩子（.githooks 目录）。
+﻿# 为当前仓库启用版本化的 Git 钩子（.githooks 目录）。
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = git rev-parse --show-toplevel

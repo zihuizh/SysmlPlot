@@ -6,6 +6,9 @@ package VehicleViews {
         filter @SysML::PartUsage;
     }
 
+    // 不带 filter 的视图定义，用于对照"expose 决定候选集、filter 决定入图元素"
+    view def 'Unfiltered View';
+
     // 递归暴露整个 vehicle 的语义范围
     view 'vehicle structure' : 'Part Structure View' {
         expose vehicle::**;
@@ -17,5 +20,10 @@ package VehicleViews {
         expose vehicle;
         expose vehicle::engine;
         expose vehicle::transmission;
+    }
+
+    // 与 'vehicle structure' 同样的 expose，但没有 filter：应能看到 attribute
+    view 'vehicle structure (unfiltered)' : 'Unfiltered View' {
+        expose vehicle::**;
     }
 }

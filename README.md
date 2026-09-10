@@ -30,6 +30,18 @@ powershell -ExecutionPolicy Bypass -File scripts/install-hooks.ps1
 
 它会设置 `core.hooksPath`，之后每次提交都会自动执行检查。规则见 `docs/DEVELOPMENT.md`。
 
+## 快速开始
+
+需要 Java 21（见 `docs/ENVIRONMENT.md`）。首次运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1
+```
+
+可加 `-Puml "<view 限定名>"` 输出 PlantUML，或用 `-Svg "<view 限定名>" -Out build\view.svg`
+导出 SVG。当前结论见 `docs/PHASE-1-FINDINGS.md`。
+
 ## 当前状态
 
 阶段 0 完成（评估与仓库初始化），阶段 1 准备开工：
