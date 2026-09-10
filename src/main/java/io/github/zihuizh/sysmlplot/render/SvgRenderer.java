@@ -265,6 +265,10 @@ public final class SvgRenderer {
                     .title { font-family: sans-serif; font-size: 14px; font-weight: bold; fill: #111; }
                     .reason { font-family: sans-serif; font-size: 11px; fill: #b3261e; }
                     .edge { fill: none; stroke: #666; stroke-width: 1.2; }
+                    .edge.typing { stroke-dasharray: 5 3; }
+                    .edge.specialization { stroke-dasharray: 9 3 2 3; }
+                    .edge.subsetting { stroke-dasharray: 2 3; }
+                    .edge.redefinition { stroke-dasharray: 9 2 2 2 2 2; }
                     .node .box { fill: #fff; stroke: #444; stroke-width: 1.2; }
                     .node .name { font-family: sans-serif; font-size: 13px; fill: #111; text-anchor: middle; }
                     .node .meta { font-family: sans-serif; font-size: 10px; fill: #777; text-anchor: middle; }

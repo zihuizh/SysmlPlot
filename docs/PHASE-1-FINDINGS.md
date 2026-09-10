@@ -128,6 +128,25 @@ Base::DataValue::self       × 1
 都会给元素重新生成随机 UUID。因此 `elementId` 已被移出视图产物，节点排序也改用
 `限定名 → 元类 → 源码偏移 → exposed 顺序`；修正后两次产物逐字节一致（SHA-256 相同）。
 
+## 关系边的实测（2026-09-10 补充）
+
+`Type.getOwnedSpecialization()` 返回的是**并集**：子集化、重定义、类型化都包含在内，
+不需要再分别遍历 `getOwnedSubsetting()` / `getOwnedRedefinition()` / `getOwnedTyping()`
+（否则会重复）。按 Java 实际类型分派即可：
+
+```java
+for (Specialization s : type.getOwnedSpecialization()) {
+    // Redefinition → FeatureTyping → Subsetting → 其余 Specialization
+}
+```
+
+实测样例 `samples/structure`（10 节点）产出 13 条边：containment 4、typing 5、
+specialization 2、subsetting 1、redefinition 1，与模型文本一一对应。
+
+同时发现一个渲染问题：分层布局只按包含关系排布，语义边不参与，于是 typing/specialization
+会横穿整张图。已按关系种类区分线型（虚线/点线/点划线）缓解，但真正的解法是按视图类型换
+布局，记在 `docs/BACKLOG.md`。
+
 ## 语义诊断（已完成）
 
 `SysMLInteractive.validate()` 只校验它自己的"当前资源"，而正规加载路径（`readAll`）不设当前

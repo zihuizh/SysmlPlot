@@ -91,7 +91,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | string | 产物内编号，形如 `r1` |
-| `kind` | string | `containment`（v0 只有这一种） |
+| `kind` | string | `containment` / `typing` / `specialization` / `subsetting` / `redefinition` |
 | `source` | string | 起点节点 id |
 | `target` | string | 终点节点 id |
 | `authored` | bool | `true` = 用户文本里写出来的；`false` = 由语义推导 |
@@ -127,8 +127,19 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `library` | 来自标准库等外部文件 |
 | `implicit` | 隐式生成，没有源码位置（如匿名多重性） |
 
-`relationship.kind`（v0）：只有 `containment`。后续计划加 `typing`、`specialization`、
-`subsetting`、`redefinition`、`satisfy`、`verify`、`flow`。
+`relationship.kind`：
+
+| 值 | 含义 | 目标端 |
+|---|---|---|
+| `containment` | 拥有关系（父子） | 子元素 |
+| `typing` | 用法被定义类型化（`: T`） | 类型定义 |
+| `specialization` | 特化（`:>`） | 泛化类型 |
+| `subsetting` | 子集化（`subsets`） | 被子集化的特征 |
+| `redefinition` | 重定义（`:>>`） | 被重定义的特征 |
+
+出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
+补节点。四类语义关系只画文本里写出来的，隐式推导的不画；`containment` 两者都画，
+由 `authored` 如实标记。后续计划补 `satisfy`、`verify`、`allocate`、`flow`、`connection`。
 
 ## 4. 排序与编号
 

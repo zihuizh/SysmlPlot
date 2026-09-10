@@ -12,7 +12,11 @@ import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.omg.sysml.lang.sysml.Element;
 import org.omg.sysml.lang.sysml.Feature;
+import org.omg.sysml.lang.sysml.FeatureTyping;
+import org.omg.sysml.lang.sysml.Redefinition;
 import org.omg.sysml.lang.sysml.RenderingUsage;
+import org.omg.sysml.lang.sysml.Specialization;
+import org.omg.sysml.lang.sysml.Subsetting;
 import org.omg.sysml.lang.sysml.Type;
 import org.omg.sysml.lang.sysml.ViewUsage;
 
@@ -59,7 +63,7 @@ public final class ViewProductBuilder {
             nodes.add(toNode(workspace, documentIds, nodeIds, element));
         }
 
-        List<ViewProduct.RelationshipRef> relationships = buildContainment(nodeIds);
+        List<ViewProduct.RelationshipRef> relationships = buildRelationships(nodeIds);
 
         List<ViewProduct.Reason> reasons = new ArrayList<>();
         int errorCount = workspace.errorCount();
@@ -153,30 +157,88 @@ public final class ViewProductBuilder {
         return node == null ? Integer.MAX_VALUE : node.getTotalOffset();
     }
 
-    private static List<ViewProduct.RelationshipRef> buildContainment(Map<Element, String> nodeIds) {
-        record Edge(String source, String target, boolean authored) {
-        }
-        List<Edge> edges = new ArrayList<>();
+    /** 产物内的一条边（编号前的中间形态）。 */
+    private record Edge(String kind, String source, String target, boolean authored) {
+    }
+
+    /**
+     * 收集边。规则：只画两端都在本产物节点集内的关系；类型/特化/子集化/重定义四类只画
+     * 文本里写出来的（隐式推导的不画），包含关系两者都画并如实标记 `authored`。
+     */
+    private static List<ViewProduct.RelationshipRef> buildRelationships(Map<Element, String> nodeIds) {
+        Map<String, Edge> edges = new LinkedHashMap<>();
         for (Map.Entry<Element, String> entry : nodeIds.entrySet()) {
-            Element owner = entry.getKey().getOwner();
-            String parentId = owner == null ? null : nodeIds.get(owner);
-            if (parentId == null) {
-                continue;
+            Element element = entry.getKey();
+            String id = entry.getValue();
+
+            Element owner = element.getOwner();
+            if (owner != null && nodeIds.containsKey(owner)) {
+                boolean authored = NodeModelUtils.findActualNodeFor(element) != null;
+                addEdge(edges, new Edge("containment", nodeIds.get(owner), id, authored));
             }
-            boolean authored = NodeModelUtils.findActualNodeFor(entry.getKey()) != null;
-            edges.add(new Edge(parentId, entry.getValue(), authored));
+
+            if (element instanceof Type type) {
+                for (Specialization specialization : type.getOwnedSpecialization()) {
+                    if (NodeModelUtils.findActualNodeFor(specialization) == null) {
+                        continue;
+                    }
+                    Element target = targetOf(specialization);
+                    if (target == null || !nodeIds.containsKey(target)) {
+                        continue;
+                    }
+                    addEdge(edges, new Edge(kindOf(specialization), id, nodeIds.get(target), true));
+                }
+            }
         }
-        edges.sort(Comparator
-                .comparing((Edge edge) -> nodeNumber(edge.source()))
+
+        List<Edge> sorted = new ArrayList<>(edges.values());
+        sorted.sort(Comparator
+                .comparing(Edge::kind)
+                .thenComparing(edge -> nodeNumber(edge.source()))
                 .thenComparing(edge -> nodeNumber(edge.target())));
 
-        List<ViewProduct.RelationshipRef> relationships = new ArrayList<>(edges.size());
-        for (int i = 0; i < edges.size(); i++) {
-            Edge edge = edges.get(i);
+        List<ViewProduct.RelationshipRef> relationships = new ArrayList<>(sorted.size());
+        for (int i = 0; i < sorted.size(); i++) {
+            Edge edge = sorted.get(i);
             relationships.add(new ViewProduct.RelationshipRef(
-                    "r" + (i + 1), "containment", edge.source(), edge.target(), edge.authored()));
+                    "r" + (i + 1), edge.kind(), edge.source(), edge.target(), edge.authored()));
         }
         return relationships;
+    }
+
+    /** 同一对端点可能既被文本写出、又被语义推导，按端点去重并优先保留 authored 的那条。 */
+    private static void addEdge(Map<String, Edge> edges, Edge edge) {
+        String key = edge.kind() + "\u0000" + edge.source() + "\u0000" + edge.target();
+        Edge existing = edges.get(key);
+        if (existing == null || (!existing.authored() && edge.authored())) {
+            edges.put(key, edge);
+        }
+    }
+
+    private static String kindOf(Specialization specialization) {
+        if (specialization instanceof Redefinition) {
+            return "redefinition";
+        }
+        if (specialization instanceof FeatureTyping) {
+            return "typing";
+        }
+        if (specialization instanceof Subsetting) {
+            return "subsetting";
+        }
+        return "specialization";
+    }
+
+    private static Element targetOf(Specialization specialization) {
+        if (specialization instanceof Redefinition redefinition) {
+            return redefinition.getRedefinedFeature();
+        }
+        if (specialization instanceof FeatureTyping typing) {
+            return typing.getType();
+        }
+        if (specialization instanceof Subsetting subsetting) {
+            return subsetting.getSubsettedFeature();
+        }
+        return specialization.getGeneral();
     }
 
     private static int nodeNumber(String nodeId) {
