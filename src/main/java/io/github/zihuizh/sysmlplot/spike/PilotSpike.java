@@ -1,5 +1,7 @@
 package io.github.zihuizh.sysmlplot.spike;
 
+import com.google.inject.Injector;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,13 +10,24 @@ import java.util.List;
 
 import org.eclipse.emf.common.util.TreeIterator;
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EPackage;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.Resource.Diagnostic;
+import org.eclipse.xtext.diagnostics.Severity;
+import org.eclipse.xtext.util.CancelIndicator;
+import org.eclipse.xtext.validation.CheckMode;
+import org.eclipse.xtext.validation.IResourceValidator;
+import org.eclipse.xtext.validation.Issue;
+import org.omg.kerml.xtext.KerMLStandaloneSetup;
+import org.omg.kerml.xtext.xmi.KerMLxStandaloneSetup;
 import org.omg.sysml.interactive.SysMLInteractive;
 import org.omg.sysml.interactive.VizResult;
 import org.omg.sysml.lang.sysml.Element;
 import org.omg.sysml.lang.sysml.RenderingUsage;
+import org.omg.sysml.lang.sysml.SysMLPackage;
 import org.omg.sysml.lang.sysml.ViewUsage;
+import org.omg.sysml.xtext.SysMLStandaloneSetup;
+import org.omg.sysml.xtext.xmi.SysMLxStandaloneSetup;
 
 /**
  * 阶段 1 spike：用 OMG 官方解析器（SysML v2 Pilot Implementation）加载一个工作区，
@@ -49,6 +62,7 @@ public final class PilotSpike {
 
         SysMLInteractive sysml = SysMLInteractive.createInstance();
         sysml.setVerbose(false);
+        IResourceValidator validator = createValidator();
         if (libDir != null) {
             sysml.loadLibrary(libDir);
             System.out.println("[library] " + libDir);
@@ -73,19 +87,35 @@ public final class PilotSpike {
         System.out.println("[workspace] " + workspacePath + " -> " + inputs.size() + " resource(s)");
 
         int errors = 0;
+        int warnings = 0;
+        int infos = 0;
         for (Resource resource : inputs) {
-            System.out.printf("  - %s (%d root element(s))%n",
-                    resource.getURI().lastSegment(),
-                    resource.getContents().size());
+            String name = resource.getURI().lastSegment();
+            System.out.printf("  - %s (%d root element(s))%n", name, resource.getContents().size());
+
+            // 解析与链接错误（EMF 层）
             for (Diagnostic diagnostic : resource.getErrors()) {
                 errors++;
-                System.out.printf("      [error] line %d: %s%n", diagnostic.getLine(), diagnostic.getMessage());
+                System.out.printf("      [parse] %s:%d %s%n", name, diagnostic.getLine(), diagnostic.getMessage());
             }
-            for (Diagnostic diagnostic : resource.getWarnings()) {
-                System.out.printf("      [warn]  line %d: %s%n", diagnostic.getLine(), diagnostic.getMessage());
+
+            // 语义诊断（Xtext 校验器）。SysMLInteractive.validate() 只校验"当前资源"，
+            // 而正规加载路径不设当前资源，所以要自己从 injector 取校验器。
+            for (Issue issue : validator.validate(resource, CheckMode.ALL, CancelIndicator.NullImpl)) {
+                Severity severity = issue.getSeverity();
+                switch (severity) {
+                    case ERROR -> errors++;
+                    case WARNING -> warnings++;
+                    default -> infos++;
+                }
+                System.out.printf("      [%s] %s:%d %s%n",
+                        severity.name().toLowerCase(),
+                        name,
+                        issue.getLineNumber(),
+                        issue.getMessage());
             }
         }
-        System.out.printf("[diagnostics] resource errors=%d%n", errors);
+        System.out.printf("[diagnostics] errors=%d warnings=%d infos=%d%n", errors, warnings, infos);
 
         List<ViewUsage> views = findAllViews(inputs);
         System.out.println("[views] found " + views.size());
@@ -140,6 +170,21 @@ public final class PilotSpike {
             }
         }
         return views;
+    }
+
+    /**
+     * 取得 Xtext 的语义校验器。
+     *
+     * <p>初始化顺序照抄 {@code SysMLInteractive.createInstance()}：先注册 EPackage，再依次
+     * 做 KerML / KerMLx / SysMLx 的 standalone setup，最后建立 SysML 的 Guice injector。
+     */
+    private static IResourceValidator createValidator() {
+        EPackage.Registry.INSTANCE.put(SysMLPackage.eNS_URI, SysMLPackage.eINSTANCE);
+        KerMLStandaloneSetup.doSetup();
+        KerMLxStandaloneSetup.doSetup();
+        SysMLxStandaloneSetup.doSetup();
+        Injector injector = new SysMLStandaloneSetup().createInjectorAndDoEMFRegistration();
+        return injector.getInstance(IResourceValidator.class);
     }
 
     private static String qualifiedNameOf(Element element) {

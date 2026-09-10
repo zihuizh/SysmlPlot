@@ -114,14 +114,37 @@ Base::DataValue::self       × 1
 
 ## 尚未解决
 
-1. **语义诊断拿不到**：`SysMLInteractive.validate()` 只校验它当前的资源；用
-   `Resource.getErrors()` 只能拿到解析/链接错误。要拿完整语义诊断，需要自己从 Xtext
-   injector 取 `IResourceValidator`。对照工具能报语义错误，说明接口存在，只是没暴露在
-   `SysMLInteractive` 上。
-2. **filter 求值失败的语义未验证**：条件里出现无法解析的引用时，候选是被排除还是被标记为
+1. **filter 求值失败的语义未验证**：条件里出现无法解析的引用时，候选是被排除还是被标记为
    "不确定"，尚未实验。
-3. **大模型性能未测**：`readAll` + `resolveAllInputResources` 在数百文件规模下的耗时与内存未知。
-4. **`getExposedElement()` 的返回顺序**是否稳定，需要重复运行验证。
+2. **大模型性能未测**：`readAll` + `resolveAllInputResources` 在数百文件规模下的耗时与内存未知。
+3. **`getExposedElement()` 的返回顺序**是否稳定，需要重复运行验证。
+
+## 语义诊断（已完成）
+
+`SysMLInteractive.validate()` 只校验它自己的"当前资源"，而正规加载路径（`readAll`）不设当前
+资源，所以拿不到语义诊断。解决办法是自己建 Xtext injector 取 `IResourceValidator`：
+
+```java
+EPackage.Registry.INSTANCE.put(SysMLPackage.eNS_URI, SysMLPackage.eINSTANCE);
+KerMLStandaloneSetup.doSetup();
+KerMLxStandaloneSetup.doSetup();
+SysMLxStandaloneSetup.doSetup();
+Injector injector = new SysMLStandaloneSetup().createInjectorAndDoEMFRegistration();
+IResourceValidator validator = injector.getInstance(IResourceValidator.class);
+
+List<Issue> issues = validator.validate(resource, CheckMode.ALL, CancelIndicator.NullImpl);
+```
+
+实测（反例见 `tests/fixtures/diagnostics/BadModel.sysml`）能同时拿到两类问题：
+
+| 来源 | 问题 | 说明 |
+|---|---|---|
+| `Resource.getErrors()` | Couldn't resolve reference to Type 'MissingType' | 解析/链接层 |
+| validator | An occurrence, item or part must be typed by occurrence definitions | 纯语义规则，EMF 层拿不到 |
+| validator | Duplicate of other owned member name ×2 | 纯语义规则，EMF 层拿不到 |
+
+注意：同一个链接错误会同时出现在 `Resource.getErrors()` 和 validator 的结果里，将来输出正式
+诊断时需要按 code + 位置去重。
 
 ## 复现方式
 

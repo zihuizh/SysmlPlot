@@ -52,6 +52,7 @@ SysmlPlot/
   scripts/                           构建、运行、校验脚本
   src/main/java/                     工具源码
   src/test/java/                     测试
+  tests/fixtures/                    反例夹具与期望输出（不参与 pre-commit 的 samples 校验）
 ```
 
 命名约定：
