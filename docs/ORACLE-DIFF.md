@@ -84,3 +84,32 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 
 `flows` 样例里官方既画了粗点线边，又在 `powerSystem` 的 `##//allocations//##` 仓格里写了
 `noname connect logical to board`。我们只画边（连接类特征不进仓格），避免同一事实出现两次。
+
+## 与 SysON 的差分
+
+`scripts/diff-syson.py` 做同样的事，只是对照对象换成 SysON（它跑在本机 Docker 里：
+`D:\03-Work\MBSE\Syson`）。流程：连 GraphQL → 按标签找到视图 → 创建/复用 General View 表示
+→ 订阅图事件读节点与边 → 与我们的产物比节点名集合。
+
+2026-09-11 实测（`samples/structure` 的 `StructureViews::structure`）：
+
+| | SysON | 我方 |
+|---|---:|---:|
+| 节点 | 6 | 10 |
+| 边 | 3 | 16 |
+
+SysON 节点名：`Axle, Car, SportsCar, Vehicle, Wheel, car`；我方多出
+`axle, frontLeft, sportsAxle, wheels`（都是嵌套的 part usage）。
+
+**结论：没有 missing**（SysON 画出来的我们都有）；差异在于 **SysON 的 General View 默认不
+物化嵌套元素**——嵌套用法需要显式投放到图上才会出现，这与它"先建空图再投放"的交互模型一致
+（早期实验里也是逐个 `dropOnDiagram`）。我们按"暴露范围"一次性物化，和官方 Pilot 的行为一致。
+
+### 踩到的三个 SysON 侧细节（供下次复用）
+
+1. **建项目需要 `templateId`**，而 `viewer.projectTemplates` 又要求 `page`/`limit`/`context`
+   三个参数（`context` 非空且形状不明）——本脚本改用了已有项目；
+2. **图节点没有 `label` 字段**，标签在 `insideLabel { text }` 与 `outsideLabels { text }`；
+   并且标签带构造型前缀（`«part» tank`），比较前要剥掉；
+3. **每次 GraphQL 调用固定 20~25 秒**（冷编辑上下文），一轮完整比对约 2 分钟；导入一个文件
+   也要 20 多秒。

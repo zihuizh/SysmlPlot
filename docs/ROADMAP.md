@@ -52,7 +52,8 @@
 - ✅ 编辑器宿主那一半：做成**编辑器无关**的 HTTP 光标通道（`serve-view.ps1` 的 `/cursor`），
   任何编辑器发一次请求即可驱动图上高亮；VS Code 扩展是它的一个薄客户端，非必需
 - ✅ 手工调整布局并独立保存（拖动节点 → 导出 layout.json → `-Layout` 重放，闭环已实测）
-- ❌ 与 SysON 的差分验证（SysON 为 Docker 部署，启动成本高，优先级低于 Pilot）
+- ✅ 与 SysON 的差分验证（`scripts/diff-syson.py`，结论见 `docs/ORACLE-DIFF.md`；
+  SysON 侧默认不物化嵌套元素，差异已解释）
 
 ## 阶段 3 · 工程化
 
