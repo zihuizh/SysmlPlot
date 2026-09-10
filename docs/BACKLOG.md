@@ -24,13 +24,13 @@
 注：Action Flow 与 State Transition 在标准库里特化自 InterconnectionView，目前判定为各自的
 `kind` 但投影走 interconnection 规则；两者的专有节点/边规则尚未实现。
 
-### 3. 仓格与源码联动
+### 3. 仓格与源码联动（部分完成）
 
-- 节点上显示属性的仓格（attributes / ports / values / doc），目前只有名字 + 图形类别
-- 点击节点跳到源码（现在只显示文档与行号）；需要宿主侧提供打开编辑器的能力
-
-参考：Pilot 的 `org.omg.sysml.plantuml.VCompartment`（649 行）是官方仓格内容规则的实现，
-可作为条目归类与排版的参照（同样只能借规则、不能借代码）。
+- ✅ **仓格**：`nodes[].compartments` 已实现（标题规则与排序对齐官方 `VCompartment`），
+  覆盖 `parameters` / `attributes` / `values` 等
+- ❌ **源码联动**：点击节点跳到源码（现在只显示文档与行号）；需要宿主侧提供打开编辑器的能力
+- ❌ 仓格里的 `documentation`（doc 文本）尚未收入；官方在 `VCompartment.addDocumentation` 里
+  有专门处理，doc 通常占用节点下方的独立区域
 
 ### 4. 端口方向（新）
 

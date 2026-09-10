@@ -27,10 +27,12 @@ public final class SvgRenderer {
     private static final double REASON_LINE = 16;
     private static final double NODE_HEIGHT = 40;
     private static final double PORT_SIZE = 18;
+    private static final double LINE_HEIGHT = 14;
+    private static final double COMPARTMENT_PAD = 6;
     private static final double H_GAP = 72;
     private static final double V_GAP = 64;
     private static final double MIN_NODE_WIDTH = 96;
-    private static final double MAX_NODE_WIDTH = 300;
+    private static final double MAX_NODE_WIDTH = 360;
     private static final int CHAR_WIDTH = 7;
     private static final int TEXT_PADDING = 20;
     private static final int MAX_LABEL_CHARS = 32;
@@ -112,6 +114,10 @@ public final class SvgRenderer {
         }
 
         double top = topOffset(product);
+        double rowHeight = 0;
+        for (ViewProduct.NodeRef node : nodes) {
+            rowHeight = Math.max(rowHeight, nodeHeight(node));
+        }
         Map<String, Layout.Box> boxes = new LinkedHashMap<>();
         for (ViewProduct.NodeRef node : nodes) {
             if (isBoundary(node)) {
@@ -121,9 +127,9 @@ public final class SvgRenderer {
             int level = depth.getOrDefault(node.id(), 0);
             boxes.put(node.id(), new Layout.Box(
                     MARGIN + center * (nodeWidth + H_GAP),
-                    top + level * (NODE_HEIGHT + V_GAP),
+                    top + level * (rowHeight + V_GAP),
                     nodeWidth,
-                    NODE_HEIGHT));
+                    nodeHeight(node)));
         }
 
         // 边界元素（端口）不参与树布局，贴在父节点的左边界上依次排开。
@@ -185,9 +191,28 @@ public final class SvgRenderer {
         int longest = 0;
         for (ViewProduct.NodeRef node : nodes) {
             longest = Math.max(longest, labelOf(node).length());
+            for (ViewProduct.CompartmentRef compartment : node.compartments()) {
+                longest = Math.max(longest, compartment.title().length() + 2);
+                for (ViewProduct.EntryRef entry : compartment.entries()) {
+                    int extra = entry.direction() == null ? 0 : entry.direction().length() + 1;
+                    longest = Math.max(longest, entry.text().length() + extra + 1);
+                }
+            }
         }
         double estimated = TEXT_PADDING * 2 + longest * (double) CHAR_WIDTH;
         return Math.max(MIN_NODE_WIDTH, Math.min(MAX_NODE_WIDTH, estimated));
+    }
+
+    /** 节点高度随仓格行数变化；边界元素（端口）固定为小方块。 */
+    private static double nodeHeight(ViewProduct.NodeRef node) {
+        if (isBoundary(node)) {
+            return PORT_SIZE;
+        }
+        int lines = 0;
+        for (ViewProduct.CompartmentRef compartment : node.compartments()) {
+            lines += 1 + compartment.entries().size();
+        }
+        return lines == 0 ? NODE_HEIGHT : NODE_HEIGHT + lines * LINE_HEIGHT + COMPARTMENT_PAD;
     }
 
     private static double topOffset(ViewProduct.Product product) {
@@ -276,6 +301,7 @@ public final class SvgRenderer {
                 svg.append(String.format(Locale.ROOT,
                         "        <text class=\"meta\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
                         box.width() / 2, 32.0, escape(metaOf(node))));
+                appendCompartments(svg, node, box);
             }
             svg.append("      </g>\n");
         }
@@ -293,6 +319,27 @@ public final class SvgRenderer {
             return node.ref();
         }
         return "(" + node.metaclass() + ")";
+    }
+
+    /** 画仓格：每个仓格一条分隔线 + 标题 + 若干条目。 */
+    private static void appendCompartments(StringBuilder svg, ViewProduct.NodeRef node, Layout.Box box) {
+        double cursor = NODE_HEIGHT;
+        for (ViewProduct.CompartmentRef compartment : node.compartments()) {
+            svg.append(String.format(Locale.ROOT,
+                    "        <line class=\"compartment-separator\" x1=\"0\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\"/>\n",
+                    cursor, box.width(), cursor));
+            cursor += LINE_HEIGHT;
+            svg.append(String.format(Locale.ROOT,
+                    "        <text class=\"compartment-title\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                    8.0, cursor - 4.0, escape(compartment.title())));
+            for (ViewProduct.EntryRef entry : compartment.entries()) {
+                cursor += LINE_HEIGHT;
+                String text = entry.direction() == null ? entry.text() : entry.direction() + " " + entry.text();
+                svg.append(String.format(Locale.ROOT,
+                        "        <text class=\"compartment-entry\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                        14.0, cursor - 4.0, escape(text)));
+            }
+        }
     }
 
     private static String metaOf(ViewProduct.NodeRef node) {
@@ -318,6 +365,9 @@ public final class SvgRenderer {
                     .node.origin-implicit .box { stroke: #aaa; stroke-dasharray: 1 3; }
                     .node.placement-boundary .box { fill: #eef2f8; stroke: #567; }
                     .node .port-name { font-family: sans-serif; font-size: 9px; fill: #456; text-anchor: end; }
+                    .compartment-separator { stroke: #e0e0e0; stroke-width: 1; }
+                    .compartment-title { font-family: sans-serif; font-size: 9px; fill: #999; }
+                    .compartment-entry { font-family: sans-serif; font-size: 11px; fill: #333; }
                   </style>
                 """;
     }

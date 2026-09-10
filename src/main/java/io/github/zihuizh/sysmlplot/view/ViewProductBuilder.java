@@ -15,12 +15,24 @@ import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.omg.sysml.lang.sysml.Connector;
 import org.omg.sysml.lang.sysml.Element;
 import org.omg.sysml.lang.sysml.Feature;
+import org.omg.sysml.lang.sysml.FeatureDirectionKind;
 import org.omg.sysml.lang.sysml.FeatureTyping;
+import org.omg.sysml.lang.sysml.FeatureValue;
+import org.omg.sysml.lang.sysml.BindingConnector;
+import org.omg.sysml.lang.sysml.Expression;
+import org.omg.sysml.lang.sysml.FlowUsage;
+import org.omg.sysml.lang.sysml.ActorMembership;
+import org.omg.sysml.lang.sysml.ObjectiveMembership;
+import org.omg.sysml.lang.sysml.OwningMembership;
 import org.omg.sysml.lang.sysml.Redefinition;
+import org.omg.sysml.lang.sysml.Relationship;
 import org.omg.sysml.lang.sysml.ReferenceSubsetting;
 import org.omg.sysml.lang.sysml.RenderingUsage;
 import org.omg.sysml.lang.sysml.Specialization;
+import org.omg.sysml.lang.sysml.StakeholderMembership;
+import org.omg.sysml.lang.sysml.SubjectMembership;
 import org.omg.sysml.lang.sysml.Subsetting;
+import org.omg.sysml.lang.sysml.SuccessionFlowUsage;
 import org.omg.sysml.lang.sysml.Type;
 import org.omg.sysml.lang.sysml.ViewDefinition;
 import org.omg.sysml.lang.sysml.ViewUsage;
@@ -101,7 +113,7 @@ public final class ViewProductBuilder {
 
         List<ViewProduct.NodeRef> nodes = new ArrayList<>(projected.size());
         for (Element element : projected) {
-            nodes.add(toNode(workspace, documentIds, nodeIds, boundaryParents, element));
+            nodes.add(toNode(workspace, documentIds, nodeIds, boundaryParents, connectors, element));
         }
 
         List<ViewProduct.RelationshipRef> relationships =
@@ -283,6 +295,7 @@ public final class ViewProductBuilder {
                                               Map<Resource, Integer> documentIds,
                                               Map<Element, String> nodeIds,
                                               Map<Element, String> boundaryParents,
+                                              List<Element> connectors,
                                               Element element) {
         String metaclass = element.eClass().getName();
         ViewProduct.SourceRef source = toSourceRef(documentIds, element);
@@ -305,7 +318,205 @@ public final class ViewProductBuilder {
                 boundaryParent == null ? null : "boundary",
                 source,
                 parent,
-                typeNamesOf(element));
+                typeNamesOf(element),
+                compartmentsOf(element, nodeIds, connectors));
+    }
+
+    /**
+     * 仓格内容：元素自有的特征，按标题分组。已经画成节点的特征（部件、端口）不再列进仓格，
+     * 否则同一个元素会同时以节点和条目两种形态出现。
+     *
+     * <p>标题规则照搬官方渲染实现（`org.omg.sysml.plantuml.CompartmentEntry.getTitle()`）。
+     */
+    private static List<ViewProduct.CompartmentRef> compartmentsOf(Element element,
+                                                                   Map<Element, String> nodeIds,
+                                                                   List<Element> connectors) {
+        if (!(element instanceof Type type)) {
+            return List.of();
+        }
+        List<Feature> features = new ArrayList<>(type.getOwnedFeature());
+        features.removeIf(nodeIds::containsKey);
+        features.removeIf(connectors::contains);
+        features.removeIf(Feature::isEnd);
+        features.sort(Comparator
+                .comparing((Feature feature) -> feature.getDirection() == null ? 1 : 0)
+                .thenComparing(feature -> feature.getDirection() == null
+                        ? Integer.MAX_VALUE
+                        : feature.getDirection().getValue())
+                .thenComparing(feature -> feature.eClass().getName())
+                .thenComparing(feature -> nullToEmpty(feature.getName())));
+
+        Map<String, List<ViewProduct.EntryRef>> groups = new LinkedHashMap<>();
+        for (Feature feature : features) {
+            groups.computeIfAbsent(titleOf(feature), key -> new ArrayList<>()).add(entryOf(feature));
+        }
+
+        // 值（`= 表达式`）挂在特征自己的 ownedRelationship 上，不在元素的 ownedFeature 里，
+        // 所以要顺着特征再找一遍。
+        for (Feature feature : collectValueFeatures(type, nodeIds, connectors)) {
+            for (Relationship relationship : feature.getOwnedRelationship()) {
+                if (relationship instanceof FeatureValue value) {
+                    String text = valueTextOf(value);
+                    if (text != null) {
+                        groups.computeIfAbsent("values", key -> new ArrayList<>())
+                                .add(new ViewProduct.EntryRef(text, qualifiedNameOrNull(feature), null, null));
+                    }
+                }
+            }
+        }
+
+        List<ViewProduct.CompartmentRef> compartments = new ArrayList<>(groups.size());
+        for (Map.Entry<String, List<ViewProduct.EntryRef>> group : groups.entrySet()) {
+            compartments.add(new ViewProduct.CompartmentRef(group.getKey(), List.copyOf(group.getValue())));
+        }
+        compartments.sort(Comparator.comparing(ViewProduct.CompartmentRef::title));
+        return List.copyOf(compartments);
+    }
+
+    /** 找出需要把值列进仓格的特征：自己不是节点、也不是已变成边的连接器。 */
+    private static List<Feature> collectValueFeatures(Type type,
+                                                      Map<Element, String> nodeIds,
+                                                      List<Element> connectors) {
+        List<Feature> features = new ArrayList<>();
+        for (Feature feature : type.getOwnedFeature()) {
+            if (nodeIds.containsKey(feature) || connectors.contains(feature)) {
+                continue;
+            }
+            features.add(feature);
+        }
+        for (Relationship relationship : type.getOwnedRelationship()) {
+            if (relationship instanceof FeatureValue value && value.getFeatureWithValue() != null
+                    && !nodeIds.containsKey(value.getFeatureWithValue())
+                    && !connectors.contains(value.getFeatureWithValue())) {
+                features.add(value.getFeatureWithValue());
+            }
+        }
+        return features;
+    }
+
+    private static ViewProduct.EntryRef entryOf(Feature feature) {
+        String name = blankToNull(feature.getName());
+        String typeText = simpleTypeNamesOf(feature);
+        String text;
+        if (name == null) {
+            text = typeText == null ? feature.eClass().getName() : typeText;
+        } else {
+            text = typeText == null ? name : name + ": " + typeText;
+        }
+        return new ViewProduct.EntryRef(text, qualifiedNameOrNull(feature), directionOf(feature), null);
+    }
+
+    /** 仓格里的类型用简单名（与官方 PUML 输出一致）；精确引用由条目的 `ref` 字段承载。 */
+    private static String simpleTypeNamesOf(Feature feature) {
+        List<String> names = new ArrayList<>();
+        for (Type type : feature.getType()) {
+            String name = blankToNull(type.getName());
+            if (name == null) {
+                name = qualifiedNameOrNull(type);
+            }
+            if (name != null) {
+                names.add(name);
+            }
+        }
+        return names.isEmpty() ? null : String.join(", ", names);
+    }
+
+    private static String valueTextOf(FeatureValue value) {
+        Feature feature = value.getFeatureWithValue();
+        String name = feature == null ? null : blankToNull(feature.getName());
+        String expressionText = null;
+        Expression expression = value.getValue();
+        if (expression != null) {
+            INode node = NodeModelUtils.findActualNodeFor(expression);
+            if (node != null) {
+                expressionText = blankToNull(node.getText().trim());
+            }
+        }
+        if (name == null && expressionText == null) {
+            return null;
+        }
+        if (name == null) {
+            return expressionText;
+        }
+        if (expressionText == null) {
+            return name;
+        }
+        String operator = value.isInitial() ? " := " : value.isDefault() ? " default " : " = ";
+        return name + operator + expressionText;
+    }
+
+    private static String directionOf(Feature feature) {
+        FeatureDirectionKind direction = feature.getDirection();
+        if (direction == null) {
+            return null;
+        }
+        return switch (direction) {
+            case IN -> "in";
+            case OUT -> "out";
+            case INOUT -> "inout";
+            default -> null;
+        };
+    }
+
+    private static String titleOf(Feature feature) {
+        OwningMembership membership = feature.getOwningMembership();
+        if (membership instanceof FeatureValue) {
+            return "values";
+        }
+        if (membership instanceof SubjectMembership) {
+            return "subject";
+        }
+        if (membership instanceof ActorMembership) {
+            return "actors";
+        }
+        if (membership instanceof StakeholderMembership) {
+            return "stakeholders";
+        }
+        if (membership instanceof ObjectiveMembership) {
+            return "objectives";
+        }
+        if (feature instanceof BindingConnector) {
+            return "bindings";
+        }
+        if (feature instanceof SuccessionFlowUsage) {
+            return "succession flows";
+        }
+        if (feature instanceof FlowUsage) {
+            return "flows";
+        }
+        if (feature.getDirection() != null) {
+            return "parameters";
+        }
+        return pluralize(stereotypeOf(feature.eClass().getName()));
+    }
+
+    /** `AttributeUsage` → `attribute`：去掉 Usage/Definition 后缀并拆驼峰。 */
+    private static String stereotypeOf(String metaclass) {
+        String base = metaclass;
+        if (base.endsWith("Definition")) {
+            base = base.substring(0, base.length() - "Definition".length());
+        } else if (base.endsWith("Usage")) {
+            base = base.substring(0, base.length() - "Usage".length());
+        }
+        StringBuilder text = new StringBuilder(base.length() + 4);
+        for (int i = 0; i < base.length(); i++) {
+            char c = base.charAt(i);
+            if (Character.isUpperCase(c) && i > 0) {
+                text.append(' ');
+            }
+            text.append(Character.toLowerCase(c));
+        }
+        return text.toString();
+    }
+
+    private static String pluralize(String word) {
+        if (word.endsWith("s")) {
+            return word + "es";
+        }
+        if (word.endsWith("data")) {
+            return word;
+        }
+        return word + "s";
     }
 
     private static int sourceOffsetOf(Element element) {

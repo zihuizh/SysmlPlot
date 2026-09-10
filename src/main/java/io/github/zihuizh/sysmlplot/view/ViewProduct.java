@@ -19,6 +19,14 @@ public final class ViewProduct {
     public record DocumentRef(int id, String uri, boolean workspace) {
     }
 
+    /** 仓格里的一条条目：一行文字，外加可选的语义引用与方向。 */
+    public record EntryRef(String text, String ref, String direction, Boolean inherited) {
+    }
+
+    /** 仓格：按标题分组的一组条目（title 规则见契约第 3.2 节）。 */
+    public record CompartmentRef(String title, List<EntryRef> entries) {
+    }
+
     public record ViewRef(String ref, String name, String definition, String kind, String rendering, SourceRef source) {
     }
 
@@ -31,7 +39,8 @@ public final class ViewProduct {
                           String placement,
                           SourceRef source,
                           String parent,
-                          List<String> types) {
+                          List<String> types,
+                          List<CompartmentRef> compartments) {
     }
 
     public record RelationshipRef(String id, String kind, String source, String target, boolean authored) {
