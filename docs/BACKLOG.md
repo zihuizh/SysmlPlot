@@ -13,16 +13,16 @@
 来源见 `docs/VIEW-PRODUCT.md` 第 3 节。验证样例：`samples/structure`。
 仍待补的语义边：`satisfy`、`verify`、`allocate`、`flow`、`connection`。
 
-### 2. 按视图类型分投影
+### 2. 按视图类型分投影（部分完成）
 
-现在只有一种通用投影。至少要区分：
+- ✅ **Interconnection**：连接器变边、端口贴节点边界（`view.kind` + `placement` + `connection`）
+- ❌ **Action Flow**：动作/控制节点 + 有序流边（现在按 interconnection 规则处理，够用但不完整）
+- ❌ **State Transition**：状态节点 + 带 trigger/guard/effect 的迁移边
 
-- **Interconnection**：嵌套 part、端口贴节点边界、连接器当边；端口与 connector usage
-  不是并列的框（端点解析规则与 General 不同）
-- **Action Flow**：动作/控制节点 + 有序流边
-- **State Transition**：状态节点 + 带 trigger/guard/effect 的迁移边
+仍待补的语义边：`satisfy`、`verify`、`allocate`、`flow`（`connection` 已完成）。
 
-顺便要补的语义边：`satisfy`、`verify`、`allocate`、`flow`、`connection`。
+注：Action Flow 与 State Transition 在标准库里特化自 InterconnectionView，目前判定为各自的
+`kind` 但投影走 interconnection 规则；两者的专有节点/边规则尚未实现。
 
 ### 3. 仓格与源码联动
 

@@ -26,7 +26,8 @@ public final class SvgRenderer {
     private static final double TITLE_BLOCK = 56;
     private static final double REASON_LINE = 16;
     private static final double NODE_HEIGHT = 40;
-    private static final double H_GAP = 36;
+    private static final double PORT_SIZE = 18;
+    private static final double H_GAP = 72;
     private static final double V_GAP = 64;
     private static final double MIN_NODE_WIDTH = 96;
     private static final double MAX_NODE_WIDTH = 300;
@@ -91,6 +92,9 @@ public final class SvgRenderer {
         Map<String, List<String>> children = new LinkedHashMap<>();
         List<String> roots = new ArrayList<>();
         for (ViewProduct.NodeRef node : nodes) {
+            if (isBoundary(node)) {
+                continue;
+            }
             String parent = node.parent();
             if (parent != null && byId.containsKey(parent)) {
                 children.computeIfAbsent(parent, key -> new ArrayList<>()).add(node.id());
@@ -110,6 +114,9 @@ public final class SvgRenderer {
         double top = topOffset(product);
         Map<String, Layout.Box> boxes = new LinkedHashMap<>();
         for (ViewProduct.NodeRef node : nodes) {
+            if (isBoundary(node)) {
+                continue;
+            }
             double center = centerX.getOrDefault(node.id(), 0.0);
             int level = depth.getOrDefault(node.id(), 0);
             boxes.put(node.id(), new Layout.Box(
@@ -118,8 +125,35 @@ public final class SvgRenderer {
                     nodeWidth,
                     NODE_HEIGHT));
         }
+
+        // 边界元素（端口）不参与树布局，贴在父节点的左边界上依次排开。
+        Map<String, Integer> boundaryIndex = new LinkedHashMap<>();
+        double orphanCursor = 0;
+        for (ViewProduct.NodeRef node : nodes) {
+            if (!isBoundary(node)) {
+                continue;
+            }
+            Layout.Box parentBox = boxes.get(node.parent());
+            double size = PORT_SIZE;
+            if (parentBox == null) {
+                boxes.put(node.id(), new Layout.Box(
+                        MARGIN + orphanCursor * (nodeWidth + H_GAP), top, nodeWidth, NODE_HEIGHT));
+                orphanCursor += 1;
+                continue;
+            }
+            int index = boundaryIndex.merge(node.parent(), 1, Integer::sum) - 1;
+            boxes.put(node.id(), new Layout.Box(
+                    parentBox.x() - size / 2,
+                    parentBox.y() + 12 + index * (size + 12),
+                    size,
+                    size));
+        }
         return new Layout.LayoutFile(Layout.SCHEMA_VERSION, product.modelDigest(),
                 product.view().ref(), boxes);
+    }
+
+    private static boolean isBoundary(ViewProduct.NodeRef node) {
+        return "boundary".equals(node.placement());
     }
 
     private static void place(String id,
@@ -221,20 +255,28 @@ public final class SvgRenderer {
             if (label.length() > MAX_LABEL_CHARS) {
                 label = label.substring(0, MAX_LABEL_CHARS - 1) + "\u2026";
             }
+            boolean boundary = isBoundary(node);
             svg.append(String.format(Locale.ROOT,
-                    "      <g class=\"node %s origin-%s\" data-id=\"%s\" data-ref=\"%s\" data-origin=\"%s\" transform=\"translate(%.1f %.1f)\">\n",
+                    "      <g class=\"node %s origin-%s%s\" data-id=\"%s\" data-ref=\"%s\" data-origin=\"%s\" transform=\"translate(%.1f %.1f)\">\n",
                     escape(node.graphic()), escape(node.origin()),
+                    boundary ? " placement-boundary" : "",
                     escape(node.id()), escape(node.ref()), escape(node.origin()),
                     box.x(), box.y()));
             svg.append(String.format(Locale.ROOT,
                     "        <rect class=\"box\" width=\"%.1f\" height=\"%.1f\" rx=\"4\"/>\n",
                     box.width(), box.height()));
-            svg.append(String.format(Locale.ROOT,
-                    "        <text class=\"name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
-                    box.width() / 2, 17.0, escape(label)));
-            svg.append(String.format(Locale.ROOT,
-                    "        <text class=\"meta\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
-                    box.width() / 2, 32.0, escape(metaOf(node))));
+            if (boundary) {
+                svg.append(String.format(Locale.ROOT,
+                        "        <text class=\"port-name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                        -6.0, box.height() / 2 + 3.0, escape(label)));
+            } else {
+                svg.append(String.format(Locale.ROOT,
+                        "        <text class=\"name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                        box.width() / 2, 17.0, escape(label)));
+                svg.append(String.format(Locale.ROOT,
+                        "        <text class=\"meta\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
+                        box.width() / 2, 32.0, escape(metaOf(node))));
+            }
             svg.append("      </g>\n");
         }
         svg.append("    </g>\n");
@@ -274,6 +316,8 @@ public final class SvgRenderer {
                     .node .meta { font-family: sans-serif; font-size: 10px; fill: #777; text-anchor: middle; }
                     .node.origin-library .box { stroke-dasharray: 4 3; }
                     .node.origin-implicit .box { stroke: #aaa; stroke-dasharray: 1 3; }
+                    .node.placement-boundary .box { fill: #eef2f8; stroke: #567; }
+                    .node .port-name { font-family: sans-serif; font-size: 9px; fill: #456; text-anchor: end; }
                   </style>
                 """;
     }

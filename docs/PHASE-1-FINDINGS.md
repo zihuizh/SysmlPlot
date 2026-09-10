@@ -147,6 +147,26 @@ specialization 2、subsetting 1、redefinition 1，与模型文本一一对应�
 会横穿整张图。已按关系种类区分线型（虚线/点线/点划线）缓解，但真正的解法是按视图类型换
 布局，记在 `docs/BACKLOG.md`。
 
+## 视图类型与连接器（2026-09-10 补充）
+
+**视图类型可以判定**：沿 `ViewDefinition` 的泛化闭包（`getOwnedSpecialization()` →
+`getGeneral()`）能找到 `StandardViewDefinitions::{GeneralView, InterconnectionView,
+ActionFlowView, StateTransitionView, …}`。`view 'x' : InterconnectionView { … }` 这种
+直接引用标准视图定义的写法可用，只需 `private import StandardViewDefinitions::*;`。
+
+**`connect` 在语义模型里的形态**：`connect tank.outlet to engine.inlet;` 产生一个匿名
+`ConnectionUsage`，它的两个端是匿名 `ReferenceUsage`（名字就是 `source` / `target`），
+`exposed` 里三者都会出现。端到真实端口的解析路径是
+`end.getOwnedReferenceSubsetting().getReferencedFeature()`（点路径再走 `getChainingFeature()`）。
+
+**端口与属主**：`expose powerSystem::**` 给出的端口是 `Tank::outlet` / `Engine::inlet`
+（定义上的端口），而不是用法上的重定义。因此"端口挂在哪个节点边界上"需要按类型闭包判定，
+否则端口会变成游离节点。实测 `tank : Tank` + `Tank::outlet` → 挂到 `tank`。
+
+**filter 的作用**：同一模型加 `filter @SysML::PartUsage or @SysML::PortUsage;` 后，
+exposed 从 18 个降到 6 个（隐式多重性、库元素、conjugated port definition 都被挡掉），
+视图立刻可读。这再次说明视图可用性主要取决于 filter。
+
 ## 语义诊断（已完成）
 
 `SysMLInteractive.validate()` 只校验它自己的"当前资源"，而正规加载路径（`readAll`）不设当前

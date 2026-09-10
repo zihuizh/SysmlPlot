@@ -19,7 +19,7 @@ public final class ViewProduct {
     public record DocumentRef(int id, String uri, boolean workspace) {
     }
 
-    public record ViewRef(String ref, String name, String definition, String rendering, SourceRef source) {
+    public record ViewRef(String ref, String name, String definition, String kind, String rendering, SourceRef source) {
     }
 
     public record NodeRef(String id,
@@ -28,6 +28,7 @@ public final class ViewProduct {
                           String metaclass,
                           String graphic,
                           String origin,
+                          String placement,
                           SourceRef source,
                           String parent,
                           List<String> types) {
