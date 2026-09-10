@@ -87,6 +87,9 @@ D:\03-Work\MBSE\Code2Model-Auto\tools\sysmlv2tool-dist\sysmlv2-tool-fat.jar
    要么用 `redefines`，要么让用法自己补充结构（本仓库样例采用后者）。
 3. **对照工具按传入路径加载文件**：只传视图文件时，它不会自动加载同工作区的模型文件，
    于是跨文件引用全部报错。要传整个目录。
+4. **PowerShell 脚本要带 UTF-8 BOM**：Windows PowerShell 5.1 会把无 BOM 的 UTF-8
+   脚本按本地代码页解码，中文注释会变成乱码并引发语法错误（实测 `Unexpected token ')'`）。
+   本仓库的 `.ps1` 一律保存为带 BOM 的 UTF-8；用 `pwsh`（PowerShell 7）则无此问题。
 
 ## 八、尚未验证的事项
 
