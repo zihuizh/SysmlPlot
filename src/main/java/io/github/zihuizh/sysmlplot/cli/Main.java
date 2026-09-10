@@ -14,6 +14,8 @@ import org.omg.sysml.lang.sysml.RenderingUsage;
 import org.omg.sysml.lang.sysml.ViewUsage;
 
 import io.github.zihuizh.sysmlplot.engine.SysMLWorkspace;
+import io.github.zihuizh.sysmlplot.render.Layout;
+import io.github.zihuizh.sysmlplot.render.SvgRenderer;
 import io.github.zihuizh.sysmlplot.view.ViewProduct;
 import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 
@@ -23,7 +25,10 @@ import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
  * <pre>
  * Main --libdir &lt;sysml.library&gt; --workspace &lt;dir&gt;                 列出视图与诊断
  * Main --libdir &lt;sysml.library&gt; --workspace &lt;dir&gt; --view &lt;ref&gt;     生成视图产物
- *                                                            --out &lt;file&gt; 写文件（默认 stdout）
+ *        [--out &lt;file&gt;]        产物写文件（默认 stdout）
+ *        [--svg &lt;file&gt;]        渲染 SVG
+ *        [--layout &lt;file&gt;]     使用既有布局
+ *        [--emit-layout &lt;file&gt;] 输出本次使用的布局
  * </pre>
  *
  * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
@@ -42,6 +47,9 @@ public final class Main {
         Path libraryDir = null;
         Path workspaceDir = null;
         Path out = null;
+        Path svg = null;
+        Path layoutIn = null;
+        Path layoutOut = null;
         String viewRef = null;
 
         for (int i = 0; i < args.length; i++) {
@@ -50,6 +58,9 @@ public final class Main {
                 case "--workspace" -> workspaceDir = Path.of(args[++i]);
                 case "--view" -> viewRef = args[++i];
                 case "--out" -> out = Path.of(args[++i]);
+                case "--svg" -> svg = Path.of(args[++i]);
+                case "--layout" -> layoutIn = Path.of(args[++i]);
+                case "--emit-layout" -> layoutOut = Path.of(args[++i]);
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -84,15 +95,44 @@ public final class Main {
         ViewProduct.Product product = ViewProductBuilder.build(workspace, target);
         String json = GSON.toJson(product) + "\n";
         if (out == null) {
-            System.out.println(json);
-        } else {
-            Path target1 = out.toAbsolutePath();
-            if (target1.getParent() != null) {
-                Files.createDirectories(target1.getParent());
+            if (svg == null) {
+                System.out.println(json);
             }
-            Files.writeString(target1, json, StandardCharsets.UTF_8);
-            System.out.println("[product] written to " + target1);
+        } else {
+            write(out, json);
+            System.out.println("[product] written to " + out.toAbsolutePath());
         }
+
+        if (svg != null || layoutOut != null) {
+            Layout.LayoutFile provided = layoutIn == null ? null : readLayout(layoutIn);
+            SvgRenderer.Result rendered = SvgRenderer.render(product, provided);
+            if (layoutOut != null) {
+                write(layoutOut, GSON.toJson(rendered.layout()) + "\n");
+                System.out.println("[layout] written to " + layoutOut.toAbsolutePath());
+            }
+            if (svg != null) {
+                write(svg, rendered.svg());
+                System.out.println("[svg] written to " + svg.toAbsolutePath());
+            }
+        }
+    }
+
+    private static Layout.LayoutFile readLayout(Path path) throws Exception {
+        Layout.LayoutFile layout = GSON.fromJson(Files.readString(path.toAbsolutePath(), StandardCharsets.UTF_8),
+                Layout.LayoutFile.class);
+        if (layout == null) {
+            throw new IllegalArgumentException("cannot read layout: " + path);
+        }
+        System.out.println("[layout] loaded " + path.toAbsolutePath());
+        return layout;
+    }
+
+    private static void write(Path path, String content) throws Exception {
+        Path target = path.toAbsolutePath();
+        if (target.getParent() != null) {
+            Files.createDirectories(target.getParent());
+        }
+        Files.writeString(target, content, StandardCharsets.UTF_8);
     }
 
     private static void printDiagnostics(SysMLWorkspace workspace) {
@@ -131,4 +171,3 @@ public final class Main {
         return null;
     }
 }
-
