@@ -49,9 +49,11 @@
 - ✅ PNG 导出（`scripts/render-png.ps1`：SVG + 无头浏览器光栅化，支持 `-Scale`）
 - ✅ 模型浏览器（交互式页面左侧大纲树，点击选中并居中）
 - ✅ 源码反查的引擎侧（`--at <path>:<line>[:<col>]` 列出覆盖该位置的节点，最内层在前）
-- ❌ 编辑器宿主那一半（编辑器光标驱动图上高亮，需要 VS Code 扩展或 LSP 客户端接上 `--at`）
+- ✅ 编辑器宿主那一半：做成**编辑器无关**的 HTTP 光标通道（`serve-view.ps1` 的 `/cursor`），
+  任何编辑器发一次请求即可驱动图上高亮；VS Code 扩展是它的一个薄客户端，非必需
 - ✅ 手工调整布局并独立保存（拖动节点 → 导出 layout.json → `-Layout` 重放，闭环已实测）
-- ❌ 与 SysON 的差分验证（SysON 为 Docker 部署，启动成本高，优先级低于 Pilot）
+- ✅ 与 SysON 的差分验证（`scripts/diff-syson.py`，结论见 `docs/ORACLE-DIFF.md`；
+  SysON 侧默认不物化嵌套元素，差异已解释）
 
 ## 阶段 3 · 工程化
 

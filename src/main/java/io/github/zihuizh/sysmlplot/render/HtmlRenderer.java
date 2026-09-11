@@ -487,6 +487,23 @@ public final class HtmlRenderer {
               var documentUris = JSON.parse(document.getElementById('view-documents').textContent);
               buildOutline();
               fit();
+
+              // 走 HTTP 时（`--serve`）轮询 /cursor：编辑器把光标位置发过去，这里高亮对应节点。
+              // 这是"编辑器 → 图形"方向联动，做成 HTTP 通道后与具体编辑器解耦。
+              if (location.protocol.indexOf('http') === 0) {
+                var lastIds = '';
+                setInterval(function () {
+                  fetch('/cursor').then(function (response) { return response.json(); }).then(function (data) {
+                    var ids = (data.ids || []).join(',');
+                    if (ids === lastIds) { return; }
+                    lastIds = ids;
+                    if (data.ids && data.ids.length) {
+                      select(data.ids[0]);
+                      centerOn(data.ids[0]);
+                    }
+                  }).catch(function () { /* 服务不可用时静默 */ });
+                }, 700);
+              }
             })();
             </script>
             </body>

@@ -323,6 +323,25 @@ onSelect(nodeId | null)   → 语义引用       // 宿主据此做属性面板�
 导出的布局可以另存为 `layout.json`，再用 `-Layout` 载入重放。闭环**已实测**：自动布局时
 `n3` 在 `(206,184)`，手工改成 `(406,284)` 后重放，渲染结果与之一致。
 
+### 6.4 预览服务与反向联动
+
+`scripts/serve-view.ps1` 把交互式页面用 HTTP 提供出来，并开放一个光标通道：
+
+```text
+GET  /                              交互式页面
+GET  /cursor                        当前光标解析结果 {"at": …, "ids": [...]}
+GET  /cursor?path=…&line=…&col=…    设置光标位置（编辑器调用这个）
+```
+
+页面（走 HTTP 时）每 700ms 轮询 `/cursor`，若有结果就高亮并居中**最内层**那个节点，
+检查器同步显示它的信息与关系。这样"编辑器光标 → 图上高亮"不需要绑定某个编辑器——
+VS Code 扩展、其他 IDE、一个快捷键脚本都能驱动它，编辑器侧只要发一次 HTTP 请求。
+
+> 实现上刻意用阻塞式 `ServerSocket` 手写，没用 `com.sun.net.httpserver`：后者依赖
+> `Selector`，而 `Selector` 初始化要开一对回环 socket 作唤醒管道，在受限环境里会被拒绝
+> （实测 `Selector.open()` 抛 "Unable to establish loopback connection"，而
+> `ServerSocket.bind` 正常）。
+
 ## 7. 版本与兼容
 
 - `schemaVersion` 递增表示字段语义有不兼容变化；新增可选字段视为兼容，不递增
