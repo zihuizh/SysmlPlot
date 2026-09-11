@@ -43,6 +43,7 @@
 - ✅ 暴露范围：`expose` 求值（官方实现）+ 递归展开自有结构特征 + 视图定义泛化闭包判定类型
 - ✅ `expose` 三种形式（成员 / 命名空间 / 递归）与视图定义继承：样例 `samples/expose-forms`，纳入差分验证
 - ✅ 需求追溯边 `satisfy`：样例 `samples/requirements`，与官方渲染一致（节点与边均对齐）
+- ✅ `allocate` 与 `flow` 边：样例 `samples/flows`；同时补上「继承端口」的展开（官方会把 `Tank::outlet` 这类继承特征画在用法上）
 - ✅ 与 OMG Pilot 的差分验证（`scripts/diff-oracle.ps1`，结论见 `docs/ORACLE-DIFF.md`）
 - ✅ SVG 导出
 - ✅ PNG 导出（`scripts/render-png.ps1`：SVG + 无头浏览器光栅化，支持 `-Scale`）

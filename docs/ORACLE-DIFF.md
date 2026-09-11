@@ -41,6 +41,7 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 | expose / membership（`expose vehicle;`） | 4 | 4 | 2 | 3 |
 | expose / namespace（`expose ExposeModel::*;`） | 6 | 6 | 4 | 5 |
 | expose / recursive（`expose vehicle::**;`） | 4 | 4 | 2 | 3 |
+| flows / allocate（`flow` + `allocate`） | 8 | 9 | 10 | 6 |
 
 后三个样例（`samples/expose-forms`）同时覆盖**视图定义继承**：filter 写在 `Structure Base`
 上，三个视图都用派生的 `Structure Derived`，实测条件被正确继承（隐式多重性、库元素都没有
@@ -71,3 +72,15 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 
 官方在 Tree 模式下不画参数的类型边；我们画了 4 条 `containment`（父节点到参数）。
 这与第 2 条是同一个表示差异。
+
+**5. `flow` 的端点粒度不同。**
+
+`flows` 样例里模型写的是 `flow of Fuel from tank.outlet.fuelSupply to engine.inlet.fuelSupply;`。
+官方把这条流画在两个**载荷特征**（`fuelSupply`）之间并标注载荷类型（`E4 --> E7 : : Fuel`）；
+我们画在两个**端口**（`outlet → inlet`）之间。语义是同一个关系，粒度不同——互联视图里
+端口到端口的箭头更贴近规范对 InterconnectionView 的描述，暂按我们的表示保留。
+
+**6. 官方把分配同时画成边和仓格文本。**
+
+`flows` 样例里官方既画了粗点线边，又在 `powerSystem` 的 `##//allocations//##` 仓格里写了
+`noname connect logical to board`。我们只画边（连接类特征不进仓格），避免同一事实出现两次。
