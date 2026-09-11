@@ -27,6 +27,8 @@ public final class SvgRenderer {
     private static final double REASON_LINE = 16;
     private static final double NODE_HEIGHT = 40;
     private static final double PORT_SIZE = 18;
+    /** 边界元素标签画在方块左侧，预留的宽度（用于避免整体越界）。 */
+    private static final double PORT_LABEL_ALLOWANCE = 44;
     private static final double LINE_HEIGHT = 14;
     private static final double COMPARTMENT_PAD = 6;
     private static final double H_GAP = 72;
@@ -153,6 +155,25 @@ public final class SvgRenderer {
                     parentBox.y() + 12 + index * (size + 12),
                     size,
                     size));
+        }
+
+        // 边界元素的标签画在方块左侧，可能落到画布外；整体右移到最左侧不越界为止。
+        double minLeft = Double.MAX_VALUE;
+        for (ViewProduct.NodeRef node : nodes) {
+            Layout.Box box = boxes.get(node.id());
+            if (box == null) {
+                continue;
+            }
+            minLeft = Math.min(minLeft, isBoundary(node) ? box.x() - PORT_LABEL_ALLOWANCE : box.x());
+        }
+        if (minLeft < MARGIN && minLeft < Double.MAX_VALUE) {
+            double shift = MARGIN - minLeft;
+            Map<String, Layout.Box> shifted = new LinkedHashMap<>();
+            for (Map.Entry<String, Layout.Box> entry : boxes.entrySet()) {
+                Layout.Box box = entry.getValue();
+                shifted.put(entry.getKey(), new Layout.Box(box.x() + shift, box.y(), box.width(), box.height()));
+            }
+            boxes = shifted;
         }
         return new Layout.LayoutFile(Layout.SCHEMA_VERSION, product.modelDigest(),
                 product.view().ref(), boxes);

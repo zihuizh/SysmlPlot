@@ -42,6 +42,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleView
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "VehicleViews::'vehicle structure'" -Html build\view.html
 powershell -ExecutionPolicy Bypass -File scripts\run-spike.ps1                       # 探查用：元素、exposed、PlantUML/SVG
 powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1                     # 与官方渲染做差分验证
+powershell -ExecutionPolicy Bypass -File scripts\render-png.ps1 -View "VehicleViews::'vehicle structure'" -Out build\view.png
 ```
 
 可加 `-Puml "<view 限定名>"` 输出 PlantUML，或用 `-Svg "<view 限定名>" -Out build\view.svg`
@@ -53,6 +54,8 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1                
 渲染走同一个命令：`-Svg` 出图，`-EmitLayout` 落盘布局，`-Layout` 用既有布局重放
 （产物与布局一致时，重放结果与首次渲染逐字节相同）。
 `-Html` 输出自包含的交互式页面（平移、缩放、点选节点看属性、按来源过滤），可离线打开。
+`scripts\render-png.ps1` 导出 PNG（先出 SVG，再用无头浏览器光栅化，`-Scale` 可放大，
+需要本机有 Chrome 或 Edge）。
 
 ## 当前状态
 

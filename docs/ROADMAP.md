@@ -44,10 +44,10 @@
 - ✅ `expose` 三种形式（成员 / 命名空间 / 递归）与视图定义继承：样例 `samples/expose-forms`，纳入差分验证
 - ✅ 与 OMG Pilot 的差分验证（`scripts/diff-oracle.ps1`，结论见 `docs/ORACLE-DIFF.md`）
 - ✅ SVG 导出
+- ✅ PNG 导出（`scripts/render-png.ps1`：SVG + 无头浏览器光栅化，支持 `-Scale`）
 - ❌ 模型浏览器（大纲树）
 - ❌ 源码双向定位的反向一半（编辑器光标驱动图上高亮，需要编辑器宿主）
 - ❌ 手工调整布局并独立保存
-- ❌ PNG 导出
 - ❌ 与 SysON 的差分验证（SysON 为 Docker 部署，启动成本高，优先级低于 Pilot）
 
 ## 阶段 3 · 工程化
