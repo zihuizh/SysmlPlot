@@ -12,6 +12,12 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'env.ps1')
 
+# 允许调用方传绝对路径（例如差分脚本把产物写到 build 下的临时目录）
+function Resolve-OutPath([string]$Path) {
+    if ([System.IO.Path]::IsPathRooted($Path)) { return $Path }
+    return (Join-Path $script:RepoRoot $Path)
+}
+
 $classes = $script:ClassesDir
 if (-not (Test-Path $classes)) { throw 'build/classes not found, run scripts/build.ps1 first' }
 
@@ -23,11 +29,11 @@ $argsList = @(
     '--workspace', (Join-Path $script:RepoRoot $Workspace)
 )
 if ($View) { $argsList += @('--view', $View) }
-if ($Out) { $argsList += @('--out', (Join-Path $script:RepoRoot $Out)) }
-if ($Svg) { $argsList += @('--svg', (Join-Path $script:RepoRoot $Svg)) }
-if ($Html) { $argsList += @('--html', (Join-Path $script:RepoRoot $Html)) }
-if ($Layout) { $argsList += @('--layout', (Join-Path $script:RepoRoot $Layout)) }
-if ($EmitLayout) { $argsList += @('--emit-layout', (Join-Path $script:RepoRoot $EmitLayout)) }
+if ($Out) { $argsList += @('--out', (Resolve-OutPath $Out)) }
+if ($Svg) { $argsList += @('--svg', (Resolve-OutPath $Svg)) }
+if ($Html) { $argsList += @('--html', (Resolve-OutPath $Html)) }
+if ($Layout) { $argsList += @('--layout', (Resolve-OutPath $Layout)) }
+if ($EmitLayout) { $argsList += @('--emit-layout', (Resolve-OutPath $EmitLayout)) }
 
 $result = Invoke-NativeCommand -Exe $script:JavaExe -Arguments $argsList
 $result.Output | ForEach-Object { Write-Host $_ }

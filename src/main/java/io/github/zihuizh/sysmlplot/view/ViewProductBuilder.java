@@ -1,9 +1,12 @@
 package io.github.zihuizh.sysmlplot.view;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -13,6 +16,7 @@ import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.omg.sysml.lang.sysml.Connector;
+import org.omg.sysml.lang.sysml.ConnectionUsage;
 import org.omg.sysml.lang.sysml.Element;
 import org.omg.sysml.lang.sysml.Feature;
 import org.omg.sysml.lang.sysml.FeatureDirectionKind;
@@ -21,15 +25,21 @@ import org.omg.sysml.lang.sysml.FeatureValue;
 import org.omg.sysml.lang.sysml.BindingConnector;
 import org.omg.sysml.lang.sysml.Expression;
 import org.omg.sysml.lang.sysml.FlowUsage;
+import org.omg.sysml.lang.sysml.ItemUsage;
 import org.omg.sysml.lang.sysml.ActorMembership;
+import org.omg.sysml.lang.sysml.ActionUsage;
 import org.omg.sysml.lang.sysml.ObjectiveMembership;
+import org.omg.sysml.lang.sysml.OccurrenceUsage;
 import org.omg.sysml.lang.sysml.OwningMembership;
+import org.omg.sysml.lang.sysml.PartUsage;
+import org.omg.sysml.lang.sysml.PortUsage;
 import org.omg.sysml.lang.sysml.Redefinition;
 import org.omg.sysml.lang.sysml.Relationship;
 import org.omg.sysml.lang.sysml.ReferenceSubsetting;
 import org.omg.sysml.lang.sysml.RenderingUsage;
 import org.omg.sysml.lang.sysml.Specialization;
 import org.omg.sysml.lang.sysml.StakeholderMembership;
+import org.omg.sysml.lang.sysml.StateUsage;
 import org.omg.sysml.lang.sysml.SubjectMembership;
 import org.omg.sysml.lang.sysml.Subsetting;
 import org.omg.sysml.lang.sysml.SuccessionFlowUsage;
@@ -64,28 +74,36 @@ public final class ViewProductBuilder {
     /** 源码片段的最大长度。 */
     private static final int MAX_SNIPPET = 160;
 
+    /** 暴露范围的节点上限，超过就截断并记录原因，避免递归展开失控。 */
+    private static final int MAX_SCOPE_NODES = 200;
+
     private ViewProductBuilder() {
     }
 
     public static ViewProduct.Product build(SysMLWorkspace workspace, ViewUsage view) {
         List<Element> exposed = new ArrayList<>(view.getExposedElement());
 
+        // 暴露范围不只是 exposed 本身。官方渲染会往已暴露元素的内部走：把其中的结构特征
+        // （部件、端口、有向特征等）也画成框。这里对齐该行为，见契约第 3.2 节。
+        boolean[] truncated = {false};
+        List<Element> scope = expandScope(exposed, truncated);
+
         // 暴露顺序本身是稳定的，作为匿名元素之间的最后一级排序依据。
         Map<Element, Integer> exposureOrder = new LinkedHashMap<>();
-        for (int i = 0; i < exposed.size(); i++) {
-            exposureOrder.put(exposed.get(i), i);
+        for (int i = 0; i < scope.size(); i++) {
+            exposureOrder.put(scope.get(i), i);
         }
 
         // 注意：不能用 elementId 参与排序——Pilot 每次加载都会重新生成随机 UUID，
         // 拿它当身份或排序依据会让产物不可复现。用限定名 + 元类 + 源码偏移 + 暴露顺序。
-        exposed.sort(Comparator
+        scope.sort(Comparator
                 .comparing((Element element) -> element.getQualifiedName() == null ? 1 : 0)
                 .thenComparing(element -> nullToEmpty(element.getQualifiedName()))
                 .thenComparing(element -> element.eClass().getName())
                 .thenComparing(ViewProductBuilder::sourceOffsetOf)
                 .thenComparing(element -> exposureOrder.getOrDefault(element, Integer.MAX_VALUE)));
 
-        Map<Resource, Integer> documentIds = collectDocuments(workspace, view, exposed);
+        Map<Resource, Integer> documentIds = collectDocuments(workspace, view, scope);
 
         String kind = viewKindOf(view);
         boolean interconnectionLike = INTERCONNECTION_KINDS.contains(kind);
@@ -93,7 +111,7 @@ public final class ViewProductBuilder {
         // 互联类视图里，连接器不是节点（它要变成边），连接器自己的端也不是节点。
         List<Element> connectors = new ArrayList<>();
         List<Element> projected = new ArrayList<>();
-        for (Element element : exposed) {
+        for (Element element : scope) {
             if (interconnectionLike && isConnector(element)) {
                 connectors.add(element);
                 continue;
@@ -109,10 +127,8 @@ public final class ViewProductBuilder {
             nodeIds.put(projected.get(i), "n" + (i + 1));
         }
 
-        // 端口的边界附着要在节点集确定之后再算。
-        Map<Element, String> boundaryParents = interconnectionLike
-                ? findBoundaryParents(projected)
-                : Map.of();
+        // 边界元素（端口、有向特征即参数）的附着要在节点集确定之后再算。
+        Map<Element, String> boundaryParents = findBoundaryParents(projected);
 
         List<ViewProduct.NodeRef> nodes = new ArrayList<>(projected.size());
         for (Element element : projected) {
@@ -123,6 +139,10 @@ public final class ViewProductBuilder {
                 buildRelationships(nodeIds, connectors, interconnectionLike);
 
         List<ViewProduct.Reason> reasons = new ArrayList<>();
+        if (truncated[0]) {
+            reasons.add(new ViewProduct.Reason("scope-truncated",
+                    "exposed scope exceeded " + MAX_SCOPE_NODES + " nodes; nested expansion stopped"));
+        }
         int errorCount = workspace.errorCount();
         if (errorCount > 0) {
             reasons.add(new ViewProduct.Reason("model-errors",
@@ -137,6 +157,51 @@ public final class ViewProductBuilder {
                 nodes,
                 relationships,
                 new ViewProduct.Completeness(reasons.isEmpty(), List.copyOf(reasons)));
+    }
+
+    /**
+     * 把 exposed 扩展成"暴露范围"：递归收集已暴露元素自有的结构特征。
+     *
+     * <p>数据特征（无方向的属性、值）不进来，它们以仓格形式呈现。
+     */
+    private static List<Element> expandScope(List<Element> exposed, boolean[] truncated) {
+        List<Element> scope = new ArrayList<>(exposed);
+        Set<Element> seen = new LinkedHashSet<>(exposed);
+        Deque<Element> queue = new ArrayDeque<>(exposed);
+        while (!queue.isEmpty()) {
+            Element current = queue.poll();
+            if (!(current instanceof Type type)) {
+                continue;
+            }
+            for (Feature feature : type.getOwnedFeature()) {
+                if (!isStructuralFeature(feature) || !seen.add(feature)) {
+                    continue;
+                }
+                if (scope.size() >= MAX_SCOPE_NODES) {
+                    truncated[0] = true;
+                    return scope;
+                }
+                scope.add(feature);
+                queue.add(feature);
+            }
+        }
+        return scope;
+    }
+
+    /** 结构特征 = 会画成框的东西；连接器除外（由投影决定它是边还是仓格条目）。 */
+    private static boolean isStructuralFeature(Feature feature) {
+        if (feature instanceof ConnectionUsage || feature instanceof BindingConnector) {
+            return false;
+        }
+        if (feature.getDirection() != null) {
+            return true;
+        }
+        return feature instanceof PortUsage
+                || feature instanceof PartUsage
+                || feature instanceof ItemUsage
+                || feature instanceof ActionUsage
+                || feature instanceof StateUsage
+                || feature instanceof OccurrenceUsage;
     }
 
     /** 视图类型：沿视图定义的泛化闭包找标准视图定义。找不到就是 `unclassified`。 */
@@ -196,7 +261,7 @@ public final class ViewProductBuilder {
 
         Map<Element, String> parents = new LinkedHashMap<>();
         for (Element element : projected) {
-            if (!"port".equals(graphicOf(element.eClass().getName()))) {
+            if (!isBoundaryCandidate(element)) {
                 continue;
             }
             Element owner = element.getOwner();
@@ -216,6 +281,14 @@ public final class ViewProductBuilder {
             }
         }
         return parents;
+    }
+
+    /** 会贴在父节点边界上的元素：端口，以及带方向的特征（参数，官方渲染成 portin/portout）。 */
+    private static boolean isBoundaryCandidate(Element element) {
+        if (!(element instanceof Feature feature)) {
+            return false;
+        }
+        return feature.getDirection() != null || "port".equals(graphicOf(element.eClass().getName()));
     }
 
     private static boolean typeClosureContains(Feature feature, Element candidate, Set<Element> visited) {

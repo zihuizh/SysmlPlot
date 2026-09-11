@@ -8,6 +8,9 @@
 一个 view 一次生成一个产物，内容是**语义投影**：这个视图里有哪些元素、它们之间是什么关系、
 各自来自哪里。它**不是一张画好的图**。
 
+投影的范围是**暴露范围**，不只是 `expose` 直接列出的元素：官方渲染会往已暴露元素的内部走，
+把其中的结构特征（部件、端口、有向特征）也画成框。我们对齐该行为——见 3.2 节。
+
 设计原则：
 
 1. **语义与布局分离**：产物不带坐标、不带尺寸、不带颜色。布局是后续独立阶段，存在单独的
@@ -78,7 +81,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `metaclass` | string | 是 | 元类名，如 `PartUsage` |
 | `graphic` | string | 是 | 建议的图形类别，见第 3 节；只是提示，渲染器可覆盖 |
 | `origin` | string | 是 | `workspace` / `library` / `implicit` |
-| `placement` | string? | | `boundary` = 贴在父节点边界上的元素（端口）；缺省表示普通内部节点 |
+| `placement` | string? | | `boundary` = 贴在父节点边界上的元素（端口、有向特征即参数）；缺省表示普通内部节点 |
 | `source` | object? | | 源码位置；`implicit` 元素没有 |
 | `parent` | string? | | 包含它的节点 id（如果有） |
 | `types` | string[]? | | 声明的类型名（`types` 原文，不做继承展开） |
@@ -198,6 +201,19 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 连接器端点解析：匿名端（`connect` 自动生成的 `source` / `target`）通过
 `Feature.getOwnedReferenceSubsetting()` 解析到真实特征；点路径走 `getChainingFeature()`
 取链尾。解析结果不在节点集时沿属主链上找。
+
+### 3.2 暴露范围（scope）
+
+节点集合 = 暴露范围，定义如下：
+
+1. `expose` 直接求值出的元素（官方实现在 `ViewUsage.getExposedElement()` 里已合并 expose 与 filter）；
+2. 递归展开：上述元素**自有的结构特征**——端口、有向特征（参数）、部件、项、动作、状态、
+   出现（occurrence）。连接器除外，它由视图类型决定是边还是仓格条目；
+3. **数据特征不进范围**：无方向的属性、值以仓格（`compartments`）形式呈现；
+4. 上限 200 个节点，超出即截断并在 `completeness.reasons` 里记 `scope-truncated`。
+
+边界元素（`placement = boundary`）的附着关系由 `parent` 表达，**不额外生成边**；渲染器据此
+把元素画在父节点边界上，也不在两者之间画连线。
 
 ## 4. 排序与编号
 

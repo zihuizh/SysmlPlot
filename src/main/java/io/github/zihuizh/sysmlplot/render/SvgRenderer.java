@@ -162,6 +162,19 @@ public final class SvgRenderer {
         return "boundary".equals(node.placement());
     }
 
+    /** 这条边是否只是"边界元素附着到所属节点"——是的话不画线，附着由位置表达。 */
+    private static boolean isAttachment(ViewProduct.Product product, ViewProduct.RelationshipRef relationship) {
+        if (!"containment".equals(relationship.kind())) {
+            return false;
+        }
+        for (ViewProduct.NodeRef node : product.nodes()) {
+            if (node.id().equals(relationship.target()) && isBoundary(node)) {
+                return relationship.source().equals(node.parent());
+            }
+        }
+        return false;
+    }
+
     private static void place(String id,
                               int level,
                               Map<String, List<String>> children,
@@ -252,6 +265,10 @@ public final class SvgRenderer {
         svg.append("  <g id=\"viewport\">\n");
         svg.append("    <g class=\"edges\">\n");
         for (ViewProduct.RelationshipRef relationship : product.relationships()) {
+            // 端口/参数与其所属节点之间的包含关系不画连线：附着由位置表达，画线会从节点本体穿过。
+            if (isAttachment(product, relationship)) {
+                continue;
+            }
             Layout.Box source = layout.nodes().get(relationship.source());
             Layout.Box target = layout.nodes().get(relationship.target());
             if (source == null || target == null) {
