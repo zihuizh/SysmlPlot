@@ -119,7 +119,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^r[0-9]+$" },
         "kind": {
-          "enum": ["containment", "typing", "specialization", "subsetting", "redefinition", "connection"]
+          "enum": ["containment", "typing", "specialization", "subsetting", "redefinition", "connection", "satisfy"]
         },
         "source": { "type": "string", "pattern": "^n[0-9]+$" },
         "target": { "type": "string", "pattern": "^n[0-9]+$" },

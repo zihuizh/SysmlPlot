@@ -181,10 +181,11 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `subsetting` | 子集化（`subsets`） | 被子集化的特征 |
 | `redefinition` | 重定义（`:>>`） | 被重定义的特征 |
 | `connection` | 连接（`connect` / connection usage） | 连接器的另一个端点 |
+| `satisfy` | 满足需求（`satisfy X;`） | 被满足的需求 |
 
 出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
 补节点。四类语义关系只画文本里写出来的，隐式推导的不画；`containment` 两者都画，
-由 `authored` 如实标记。后续计划补 `satisfy`、`verify`、`allocate`、`flow`、`connection`。
+由 `authored` 如实标记。后续计划补 `verify`、`allocate`、`flow`。
 
 ### 3.1 按视图类型的投影规则
 

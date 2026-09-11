@@ -19,7 +19,7 @@
 - ❌ **Action Flow**：动作/控制节点 + 有序流边（现在按 interconnection 规则处理，够用但不完整）
 - ❌ **State Transition**：状态节点 + 带 trigger/guard/effect 的迁移边
 
-仍待补的语义边：`satisfy`、`verify`、`allocate`、`flow`（`connection` 已完成）。
+仍待补的语义边：`verify`、`allocate`、`flow`（`connection`、`satisfy` 已完成）。
 
 注：Action Flow 与 State Transition 在标准库里特化自 InterconnectionView，目前判定为各自的
 `kind` 但投影走 interconnection 规则；两者的专有节点/边规则尚未实现。
