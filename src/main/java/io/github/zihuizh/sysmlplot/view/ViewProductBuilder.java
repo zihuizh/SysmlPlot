@@ -17,6 +17,7 @@ import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.omg.sysml.lang.sysml.Connector;
 import org.omg.sysml.lang.sysml.ConnectionUsage;
+import org.omg.sysml.lang.sysml.ConstraintUsage;
 import org.omg.sysml.lang.sysml.Element;
 import org.omg.sysml.lang.sysml.Feature;
 import org.omg.sysml.lang.sysml.FeatureDirectionKind;
@@ -34,6 +35,11 @@ import org.omg.sysml.lang.sysml.OccurrenceUsage;
 import org.omg.sysml.lang.sysml.OwningMembership;
 import org.omg.sysml.lang.sysml.PartUsage;
 import org.omg.sysml.lang.sysml.PortUsage;
+import org.omg.sysml.lang.sysml.PerformActionUsage;
+import org.omg.sysml.lang.sysml.Documentation;
+import org.omg.sysml.lang.sysml.RequirementVerificationMembership;
+import org.omg.sysml.lang.sysml.RequirementUsage;
+import org.omg.sysml.lang.sysml.VerificationCaseUsage;
 import org.omg.sysml.lang.sysml.Redefinition;
 import org.omg.sysml.lang.sysml.Relationship;
 import org.omg.sysml.lang.sysml.ReferenceSubsetting;
@@ -196,6 +202,16 @@ public final class ViewProductBuilder {
                     }
                     continue;
                 }
+                // `perform X;` 本身不进节点集（它是边），但**被执行的动作用法要拉进范围**：
+                // 否则边的一端落不到节点上，整条 perform 边会消失。
+                if (feature instanceof PerformActionUsage perform) {
+                    Element performed = perform.getPerformedAction();
+                    if (performed instanceof Feature performedFeature && seen.add(performedFeature)) {
+                        scope.add(performedFeature);
+                        queue.add(performedFeature);
+                    }
+                    continue;
+                }
                 if (!isStructuralFeature(feature) || !seen.add(feature)) {
                     continue;
                 }
@@ -255,7 +271,8 @@ public final class ViewProductBuilder {
     /** 结构特征 = 会画成框的东西；连接器除外（由投影决定它是边还是仓格条目）。 */
     private static boolean isStructuralFeature(Feature feature) {
         if (feature instanceof ConnectionUsage || feature instanceof BindingConnector
-                || feature instanceof SatisfyRequirementUsage) {
+                || feature instanceof SatisfyRequirementUsage || feature instanceof PerformActionUsage
+                || feature instanceof ConstraintUsage) {
             return false;
         }
         if (feature.getDirection() != null) {
@@ -460,6 +477,7 @@ public final class ViewProductBuilder {
                 source,
                 parent,
                 typeNamesOf(element),
+                element instanceof RequirementUsage requirement ? blankToNull(requirement.getReqId()) : null,
                 compartmentsOf(element, nodeIds, connectors));
     }
 
@@ -480,6 +498,7 @@ public final class ViewProductBuilder {
         features.removeIf(connectors::contains);
         features.removeIf(Feature::isEnd);
         features.removeIf(SatisfyRequirementUsage.class::isInstance);
+        features.removeIf(PerformActionUsage.class::isInstance);
         features.sort(Comparator
                 .comparing((Feature feature) -> feature.getDirection() == null ? 1 : 0)
                 .thenComparing(feature -> feature.getDirection() == null
@@ -512,7 +531,23 @@ public final class ViewProductBuilder {
             compartments.add(new ViewProduct.CompartmentRef(group.getKey(), List.copyOf(group.getValue())));
         }
         compartments.sort(Comparator.comparing(ViewProduct.CompartmentRef::title));
+
+        // 文档（doc）单独成一个仓格：官方渲染也把它放在节点下方独立区域
+        List<ViewProduct.EntryRef> docs = new ArrayList<>();
+        for (Documentation documentation : element.getDocumentation()) {
+            String body = blankToNull(collapse(documentation.getBody()));
+            if (body != null) {
+                docs.add(new ViewProduct.EntryRef(body, null, null, null));
+            }
+        }
+        if (!docs.isEmpty()) {
+            compartments.add(new ViewProduct.CompartmentRef("documentation", List.copyOf(docs)));
+        }
         return List.copyOf(compartments);
+    }
+
+    private static String collapse(String text) {
+        return text == null ? null : text.replaceAll("\\s+", " ").trim();
     }
 
     /** 找出需要把值列进仓格的特征：自己不是节点、也不是已变成边的连接器。 */
@@ -721,6 +756,8 @@ public final class ViewProductBuilder {
         }
 
         collectSatisfyEdges(nodeIds, edges);
+        collectVerifyEdges(nodeIds, edges);
+        collectPerformEdges(nodeIds, edges);
 
         List<Edge> sorted = new ArrayList<>(edges.values());
         sorted.sort(Comparator
@@ -774,6 +811,73 @@ public final class ViewProductBuilder {
                 }
             }
         }
+    }
+
+    /**
+     * `verify` 边：验证用例 → 被验证的需求。
+     *
+     * <p>模型里写的是 `objective { verify req; }`，语义上由
+     * `RequirementVerificationMembership` 承载。优先用派生查询
+     * `VerificationCaseUsage.getVerifiedRequirement()`（它会把嵌套的目标成员关系一并算出来），
+     * 再用成员关系扫描兜底——两种写法都能覆盖。
+     */
+    private static void collectVerifyEdges(Map<Element, String> nodeIds, Map<String, Edge> edges) {
+        for (Map.Entry<Element, String> entry : nodeIds.entrySet()) {
+            Element element = entry.getKey();
+            if (element instanceof VerificationCaseUsage verification) {
+                for (RequirementUsage verified : verification.getVerifiedRequirement()) {
+                    addEdgeIfResolved(edges, nodeIds, "verify", element, verified, element);
+                }
+            }
+            for (Relationship relationship : element.getOwnedRelationship()) {
+                if (relationship instanceof RequirementVerificationMembership membership) {
+                    addEdgeIfResolved(edges, nodeIds, "verify", element,
+                            membership.getVerifiedRequirement(), membership);
+                }
+            }
+        }
+    }
+
+    /**
+     * `perform` 边：执行方（部件/动作）→ 被执行的动作用法。
+     *
+     * <p>`perform X;` 语句本身不进节点集（否则同一个事实会同时是节点和边），
+     * 与 `satisfy` / 连接器的处理方式一致。
+     */
+    private static void collectPerformEdges(Map<Element, String> nodeIds, Map<String, Edge> edges) {
+        for (Map.Entry<Element, String> entry : nodeIds.entrySet()) {
+            // 与 satisfy 一样：perform 语句是**节点的自有特征**，不是节点本身
+            if (!(entry.getKey() instanceof Type type)) {
+                continue;
+            }
+            for (Feature feature : type.getOwnedFeature()) {
+                if (!(feature instanceof PerformActionUsage perform)) {
+                    continue;
+                }
+                // 被执行的动作用法可能不在节点集里；退回 reference subsetting / 特征链解析
+                Element performed = perform.getPerformedAction();
+                if (performed == null || nodeIdFor(performed, nodeIds) == null) {
+                    performed = resolveConnectorEnd(perform, 0);
+                }
+                addEdgeIfResolved(edges, nodeIds, "perform", perform.getOwner(), performed, perform);
+            }
+        }
+    }
+
+    /** 两端都能落到节点上才出边。 */
+    private static void addEdgeIfResolved(Map<String, Edge> edges,
+                                          Map<Element, String> nodeIds,
+                                          String kind,
+                                          Element source,
+                                          Element target,
+                                          Element authoredSource) {
+        String sourceId = source == null ? null : nodeIdFor(source, nodeIds);
+        String targetId = target == null ? null : nodeIdFor(target, nodeIds);
+        if (sourceId == null || targetId == null) {
+            return;
+        }
+        boolean authored = authoredSource != null && NodeModelUtils.findActualNodeFor(authoredSource) != null;
+        addEdge(edges, new Edge(kind, sourceId, targetId, authored));
     }
 
     /** 把连接器端解析到真实特征：匿名端走 reference subsetting，点路径走特征链。 */

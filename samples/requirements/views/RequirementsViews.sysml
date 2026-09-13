@@ -5,5 +5,7 @@ package RequirementsViews {
     view 'requirement trace' : GeneralView {
         expose vehicleDesign;
         expose massLimitReq;
+        expose massTest;
+        expose MassLimit;
     }
 }

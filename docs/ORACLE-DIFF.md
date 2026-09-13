@@ -28,20 +28,39 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 **刻意不做"必须完全相等"的断言**：官方渲染有它自己的选择（递归进已暴露元素、重复画同一
 元素、省略无名元素、把参数画成端口），差异需要人来判断。这个脚本的职责是把差异摆出来。
 
-## 当前结果（2026-09-10）
+### 比较前的归一化
 
-七个样例视图的节点名集合**全部一致**，无 missing：
+官方 PUML 的标签带一些**表示层**的装饰，不剥掉会变成假阳性（实测踩过两次）：
+
+| 装饰 | 例子 | 处理 |
+|---|---|---|
+| 多重性后缀 | `seatBelt[2]` | 剥掉尾部 `[...]` |
+| 需求编号前缀 | `~<1.1> massLimitReq` | 剥掉前置的 `~<…>` |
+| 构造型前缀 | `«part» tank` | 剥掉 `«…»`（SysON 对比同理） |
+| 类型后缀 | `tank: Tank` | 只取 `:` 之前的一段 |
+
+前两条在 `scripts/oracle_diff.py` 的 `normalize_label()` 里，第三、四条在
+`scripts/diff-syson.py` 里。
+
+## 当前结果（2026-09-14）
+
+九个样例视图的节点名集合**无 missing**：
 
 | 样例 | 官方节点 | 我方节点 | 官方边 | 我方边 |
 |---|---:|---:|---:|---:|
 | vehicle / structure | 3 | 3 | 2 | 2 |
 | structure / parts | 10 | 10 | 18 | 13 |
-| interconnection / power | 5 | 5 | 5 | 3 |
-| parameters / values | 6 | 7 | 0 | 4 |
+| interconnection / power | 5 | 7 | 5 | 3 |
+| parameters / values（含 `perform`） | 8 | 9 | 1 | 6 |
 | expose / membership（`expose vehicle;`） | 4 | 4 | 2 | 3 |
 | expose / namespace（`expose ExposeModel::*;`） | 6 | 6 | 4 | 5 |
 | expose / recursive（`expose vehicle::**;`） | 4 | 4 | 2 | 3 |
+| requirements / satisfy（含 `verify` 与需求号） | 4 | 5 | 2 | 3 |
 | flows / allocate（`flow` + `allocate`） | 8 | 9 | 10 | 6 |
+
+"官方节点"已按标签去重；我方多出的部分是**已知差异**里的表示选择，不是漏画：
+`interconnection` 多 `fuelSupply`（第 7 条）、`requirements` 多 `testVehicle`
+（验证用例的 `subject`，官方渲染不画它，但也因此不画它到需求的那条线）。
 
 后三个样例（`samples/expose-forms`）同时覆盖**视图定义继承**：filter 写在 `Structure Base`
 上，三个视图都用派生的 `Structure Derived`，实测条件被正确继承（隐式多重性、库元素都没有

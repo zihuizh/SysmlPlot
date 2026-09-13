@@ -85,6 +85,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `source` | object? | | 源码位置；`implicit` 元素没有 |
 | `parent` | string? | | 包含它的节点 id（如果有） |
 | `types` | string[]? | | 声明的类型名（`types` 原文，不做继承展开） |
+| `reqId` | string? | | 需求编号：原文写的短名（`requirement <'1.1'> massLimitReq` → `1.1`）；只有需求类元素有 |
 | `compartments` | array? | | 仓格内容，见 2.3.1 |
 
 **不含 `elementId`**：实测 Pilot 每次加载都会为元素重新生成随机 UUID，同一个模型两次运行得到的
@@ -115,10 +116,15 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `SubjectMembership` / `ActorMembership` / `StakeholderMembership` / `ObjectiveMembership` | `subject` / `actors` / `stakeholders` / `objectives` |
 | 带方向的特征 | `parameters` |
 | `BindingConnector` / `FlowUsage` / `SuccessionFlowUsage` | `bindings` / `flows` / `succession flows` |
+| 文档（`Documentation` 成员） | `documentation` |
 | 其余 | 元类名去 `Usage`/`Definition` 后缀、拆驼峰、复数化，如 `AttributeUsage` → `attributes` |
 
 **排序**（同样对齐官方）：参数优先且按 `in` → `out` → `inout`；然后按元类名；最后按名字。
 仓格之间按标题字典序。类型名在仓格里用简单名（与官方 PUML 输出一致），精确引用放条目的 `ref`。
+
+`documentation` 仓格收的是元素自有的 `doc` 文本，正文里的连续空白折叠为单空格；官方渲染把
+文档放在节点下方的独立区域（`VCompartment.addDocumentation`），所以它单独成格，不和
+`attributes` 之类混在一起。
 
 `source` 结构：`{ "document": int, "line": int, "offset": int, "length": int, "snippet": string? }`，
 `line` 从 1 开始，`offset` 是文档内字符偏移。`length` 是元素的文本范围，**包含其子元素**，
@@ -135,7 +141,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | string | 产物内编号，形如 `r1` |
-| `kind` | string | `containment` / `typing` / `specialization` / `subsetting` / `redefinition` |
+| `kind` | string | 关系类型，取值见第 3 节的词表 |
 | `source` | string | 起点节点 id |
 | `target` | string | 终点节点 id |
 | `authored` | bool | `true` = 用户文本里写出来的；`false` = 由语义推导 |
@@ -182,12 +188,15 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `redefinition` | 重定义（`:>>`） | 被重定义的特征 |
 | `connection` | 连接（`connect` / connection usage） | 连接器的另一个端点 |
 | `satisfy` | 满足需求（`satisfy X;`） | 被满足的需求 |
+| `verify` | 验证需求（`objective { verify X; }`） | 被验证的需求 |
 | `allocate` | 分配（`allocate x to y;`） | 被分配到的目标 |
 | `flow` | 流（`flow of T from a to b;`） | 流的终点 |
+| `perform` | 执行动作（`perform X;`） | 被执行的动作用法 |
 
 出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
-补节点。四类语义关系只画文本里写出来的，隐式推导的不画；`containment` 两者都画，
-由 `authored` 如实标记。后续计划补 `verify`。
+补节点。语义关系（`connection` / `satisfy` / `verify` / `allocate` / `flow` / `perform`）
+只画文本里写出来的，隐式推导的不画；`containment` 两者都画，由 `authored` 如实标记。
+后续计划补 `derive`（需求派生）与 `succession`（`first A then B`）。
 
 ### 3.1 按视图类型的投影规则
 
@@ -212,8 +221,10 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 1. `expose` 直接求值出的元素（官方实现在 `ViewUsage.getExposedElement()` 里已合并 expose 与 filter）；
 2. 递归展开：上述元素**自有的结构特征**——端口、有向特征（参数）、部件、项、动作、状态、
    出现（occurrence）。连接器除外，它由视图类型决定是边还是仓格条目；
-3. **数据特征不进范围**：无方向的属性、值以仓格（`compartments`）形式呈现；
-4. 上限 200 个节点，超出即截断并在 `completeness.reasons` 里记 `scope-truncated`。
+3. **`perform x;` 会把被执行的动作用法拉进范围**：`perform` 本身是边、不占节点，但它的目标
+   若不在节点集里，边的一端就落不到节点上、整条边会消失（实测），因此显式补进来；
+4. **数据特征不进范围**：无方向的属性、值以仓格（`compartments`）形式呈现；
+5. 上限 200 个节点，超出即截断并在 `completeness.reasons` 里记 `scope-truncated`。
 
 边界元素（`placement = boundary`）的附着关系由 `parent` 表达，**不额外生成边**；渲染器据此
 把元素画在父节点边界上，也不在两者之间画连线。

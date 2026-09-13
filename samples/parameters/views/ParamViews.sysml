@@ -6,5 +6,6 @@ package ParamViews {
         expose Focus;
         expose Shoot;
         expose Settings;
+        expose camera;
     }
 }

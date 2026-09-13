@@ -25,6 +25,8 @@ def normalize_label(label: str) -> str:
     if ":" in text:
         text = text.split(":", 1)[0]
     text = text.strip()
+    # 官方会把需求号画进标签（`~<1.1> massLimitReq`），这不是节点差异
+    text = re.sub(r"^~?<[^>]*>\s*", "", text)
     # 官方会在标签上带多重性后缀（`seatBelt[2]`），这不是节点集合的差异，比较前剥掉
     return re.sub(r"\[[^\]]*\]$", "", text).strip()
 
