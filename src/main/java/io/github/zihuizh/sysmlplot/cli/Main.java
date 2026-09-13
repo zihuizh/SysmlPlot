@@ -22,6 +22,7 @@ import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 import io.github.zihuizh.sysmlplot.view.SourceLookup;
 import io.github.zihuizh.sysmlplot.view.ModelQuery;
 import io.github.zihuizh.sysmlplot.view.LocalViewBuilder;
+import io.github.zihuizh.sysmlplot.view.TraceMatrix;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndex;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
 
@@ -44,9 +45,12 @@ import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
  *        [--all-views &lt;dir&gt;]   一次加载把工作区里**所有视图**各导出一份产物
  *        [--query &lt;kind&gt; --ref &lt;ref&gt; [--depth N]]  查询：neighbors / impact / views / subgraph
  *        [--local-view &lt;ref&gt;]   以某元素为中心生成**局部关系视图**（产物变换，可配 -Svg/-Html）
+ *        [--matrix]            需求追溯矩阵（稀疏列表 + 按包分块；配 -Out 输出 JSON）
+ *        [--gaps-only]         只保留既无满足方、也无验证方的需求
+ *        [--gate]              覆盖率门禁：有缺口即以退出码 4 结束
  * </pre>
  *
- * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
+ * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误；4 覆盖率门禁未通过。
  */
 public final class Main {
 
@@ -59,6 +63,13 @@ public final class Main {
     }
 
     public static void main(String[] args) throws Exception {
+        // 控制台输出固定用 UTF-8：Windows 的默认代码页会把中文写成 GBK，
+        // 重定向到文件后按 UTF-8 读就是乱码，而产物、文档、脚本都约定 UTF-8。
+        System.setOut(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out),
+                true, StandardCharsets.UTF_8));
+        System.setErr(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.err),
+                true, StandardCharsets.UTF_8));
+
         Path libraryDir = null;
         Path workspaceDir = null;
         Path out = null;
@@ -77,6 +88,9 @@ public final class Main {
         String queryRef = null;
         int queryDepth = 1;
         String localViewRef = null;
+        boolean matrix = false;
+        boolean gapsOnly = false;
+        boolean gate = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -98,6 +112,9 @@ public final class Main {
                 case "--ref" -> queryRef = args[++i];
                 case "--depth" -> queryDepth = Integer.parseInt(args[++i]);
                 case "--local-view" -> localViewRef = args[++i];
+                case "--matrix" -> matrix = true;
+                case "--gaps-only" -> gapsOnly = true;
+                case "--gate" -> gate = true;
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -132,6 +149,25 @@ public final class Main {
                 System.exit(3);
             }
             printQuery(WorkspaceIndexBuilder.build(workspace), query, queryRef, queryDepth);
+            return;
+        }
+
+        // 追溯矩阵：全模型口径，不看单个视图的 expose 边界
+        if (matrix) {
+            TraceMatrix.Matrix full = TraceMatrix.build(WorkspaceIndexBuilder.build(workspace));
+            TraceMatrix.Matrix shown = gapsOnly ? TraceMatrix.gapsOnly(full) : full;
+            System.out.print(TraceMatrix.toText(shown));
+            if (out != null) {
+                write(out, GSON.toJson(shown) + "\n");
+                System.out.println("[matrix] written to " + out.toAbsolutePath());
+            }
+            if (gate) {
+                if (full.gaps() > 0) {
+                    System.err.printf("[gate] %d 条需求既没有满足方、也没有验证方%n", full.gaps());
+                    System.exit(4);
+                }
+                System.out.println("[gate] 需求覆盖检查通过：没有缺口");
+            }
             return;
         }
 

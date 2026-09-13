@@ -121,8 +121,11 @@ git config core.hooksPath .githooks
 | 禁止文件类型 | `jar`、`class`、`exe`、`dll`、`so`、`dylib`、归档包等二进制 |
 | 单文件大小 | 默认上限 2 MB，可用 `SYMLPLOT_MAX_FILE_KB` 调整 |
 | 样例校验 | staged 中出现 `samples/**/*.sysml` 时，调用官方解析器验证 |
+| 覆盖率门禁 | staged 中出现 `samples/` 或 `src/` 改动时，跑 `scripts/check-trace.ps1`：应当无缺口的工作区有缺口就阻断提交 |
 
 样例校验依赖 Java 21 与本地对照工具；未找到时跳过并提示，不阻断提交。
+覆盖率门禁依赖 PowerShell；未找到时同样跳过并提示。`samples/requirements` 故意留着缺口
+（门禁的反例），不在默认检查名单里。
 
 `commit-msg` 检查提交信息格式（见 1.2）。
 

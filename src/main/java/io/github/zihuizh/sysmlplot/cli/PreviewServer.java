@@ -24,6 +24,7 @@ import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndex;
 import io.github.zihuizh.sysmlplot.view.ModelQuery;
 import io.github.zihuizh.sysmlplot.view.LocalViewBuilder;
+import io.github.zihuizh.sysmlplot.view.TraceMatrix;
 import io.github.zihuizh.sysmlplot.engine.SysMLWorkspace;
 import io.github.zihuizh.sysmlplot.render.HtmlRenderer;
 import org.omg.sysml.lang.sysml.ViewUsage;
@@ -43,6 +44,7 @@ import org.omg.sysml.lang.sysml.ViewUsage;
  * GET  /impact?ref=…&depth=N          影响范围（表格页）
  * GET  /local?ref=…&depth=N           以该元素为中心的局部关系视图（HTML）
  * GET  /view?ref=&lt;视图&gt;&amp;focus=&lt;元素&gt;          切到另一个视图并聚焦到该元素
+ * GET  /matrix?gaps=1                 需求追溯矩阵（gaps=1 只看有缺口的行）
  * </pre>
  *
  * <p>只监听 127.0.0.1。刻意用阻塞式 socket 手写，而不是 {@code com.sun.net.httpserver}：
@@ -164,6 +166,14 @@ public final class PreviewServer {
                 Map<String, String> params = parseQuery(query);
                 respond(out, 200, "text/html; charset=utf-8",
                         viewPage(params.get("ref"), params.get("focus")).getBytes(StandardCharsets.UTF_8));
+            } else if ("/matrix".equals(path)) {
+                Map<String, String> params = parseQuery(query);
+                TraceMatrix.Matrix matrix = TraceMatrix.build(index);
+                if ("1".equals(params.get("gaps")) || "true".equals(params.get("gaps"))) {
+                    matrix = TraceMatrix.gapsOnly(matrix);
+                }
+                respond(out, 200, "application/json; charset=utf-8",
+                        json(matrix).getBytes(StandardCharsets.UTF_8));
             } else if ("/".equals(path) || "/index.html".equals(path)) {
                 respond(out, 200, "text/html; charset=utf-8", html.getBytes(StandardCharsets.UTF_8));
             } else {

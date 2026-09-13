@@ -41,6 +41,7 @@ import org.omg.sysml.lang.sysml.Documentation;
 import org.omg.sysml.lang.sysml.MetadataFeature;
 import org.omg.sysml.lang.sysml.RequirementVerificationMembership;
 import org.omg.sysml.lang.sysml.RequirementUsage;
+import org.omg.sysml.lang.sysml.VerificationCaseDefinition;
 import org.omg.sysml.lang.sysml.VerificationCaseUsage;
 import org.omg.sysml.lang.sysml.Redefinition;
 import org.omg.sysml.lang.sysml.Relationship;
@@ -857,11 +858,23 @@ public final class ViewProductBuilder {
             }
             for (Relationship relationship : element.getOwnedRelationship()) {
                 if (relationship instanceof RequirementVerificationMembership membership) {
-                    addEdgeIfResolved(edges, nodeIds, "verify", element,
+                    // 边要从**验证用例**出发，而不是从 `objective { … }` 生成的包装用法出发：
+                    // 包装用法是编译器产物（Pilot 给它起名叫 `obj`，官方渲染器同样特殊处理它）。
+                    addEdgeIfResolved(edges, nodeIds, "verify", enclosingCase(element),
                             membership.getVerifiedRequirement(), membership);
                 }
             }
         }
+    }
+
+    /** 向上找承载这条验证的验证用例（定义或用法）；找到才是真正的验证方。 */
+    private static Element enclosingCase(Element element) {
+        for (Element current = element; current != null; current = current.getOwner()) {
+            if (current instanceof VerificationCaseUsage || current instanceof VerificationCaseDefinition) {
+                return current;
+            }
+        }
+        return null;
     }
 
     /**

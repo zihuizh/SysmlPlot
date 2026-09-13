@@ -14,6 +14,7 @@ import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.omg.sysml.lang.sysml.Connector;
 import org.omg.sysml.lang.sysml.Element;
+import org.omg.sysml.lang.sysml.RequirementUsage;
 import org.omg.sysml.lang.sysml.ViewUsage;
 
 import io.github.zihuizh.sysmlplot.engine.SysMLWorkspace;
@@ -70,7 +71,11 @@ public final class WorkspaceIndexBuilder {
             entries.add(new WorkspaceIndex.ElementEntry(
                     ref,
                     blankToNull(element.getName()),
+                    element instanceof RequirementUsage requirement ? blankToNull(requirement.getReqId()) : null,
                     element.eClass().getName(),
+                    element.getOwningRelationship() == null
+                            ? null
+                            : element.getOwningRelationship().eClass().getName(),
                     originOf(element),
                     sourceOf(element),
                     viewsByRef.getOrDefault(ref, List.of())));

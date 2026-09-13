@@ -14,8 +14,8 @@
 |---|---|---|
 | 1 | 需求 X 由哪些部件满足？ | ✅ `satisfy` 边反向查 |
 | 2 | 部件 P 的行为链是什么？ | ✅ `allocate` / `flow` / `perform` / `succession` 四类边齐备 |
-| 3 | 改动元素 E 会影响哪些需求？ | ❌ 缺逆向可达查询 |
-| 4 | 哪些需求没有任何实现或验证？ | ❌ 缺覆盖率校验 |
+| 3 | 改动元素 E 会影响哪些需求？ | ✅ 反向可达查询（`--query impact`、`/impact`） |
+| 4 | 哪些需求没有任何实现或验证？ | ✅ 追溯矩阵 + 覆盖率门禁（`--matrix --gaps-only --gate`） |
 | 5 | 同一元素出现在哪些视图里？ | ✅ 已验证（同一 ref 出现在 3 个视图） |
 | 6 | 以某元素为中心，它连到谁？ | 🟡 有 1 跳关系，但不可点击、无多跳、无局部图 |
 
@@ -63,6 +63,7 @@
   "modelDigest": "sha256:…",
   "elements": [
     { "ref": "Model::tank", "name": "tank", "metaclass": "PartUsage",
+      "reqId": null, "ownerMembership": "OwningMembership",
       "origin": "workspace", "source": { "document": 0, "line": 12, "snippet": "…" },
       "views": ["Views::structure"] }
   ],
@@ -72,6 +73,11 @@
   ]
 }
 ```
+
+另外两个字段是为追溯矩阵加的：`reqId`（需求号，如 `1.1`）让矩阵按编号排列；
+`ownerMembership`（所属成员关系的元类）让矩阵能排除**编译器生成的包装用法**——
+`objective { … }` 会生成一个需求用法，`verify X;` 又会生成一个被验证需求副本，
+它们不是被建模的需求（Pilot 给前者起名叫 `obj`，官方渲染器同样特殊处理它）。
 
 三条硬约束：
 
@@ -94,6 +100,35 @@ traverse(ref, direction = out | in | both, kinds = [...], depth = N)
 | 局部关系视图 | `traverse(ref, both, 全类型, N)` → 生成**子产物** |
 | 影响范围分析 | `traverse(ref, in, 影响型边, N)`，再按 `authored`/`origin` 过滤 |
 | 追溯矩阵 | `traverse(reqRef, in, [satisfy, verify, derive], 1)` |
+
+### 3.3 追溯矩阵与覆盖率门禁
+
+矩阵是**全模型**口径（走索引，不看某个视图的 `expose` 边界），行是需求用法、列是关系：
+
+```text
+[matrix] requirements=2 satisfied=1 verified=1 gaps=1
+
+## RequirementsModel  (需求 2 / 已满足 1 / 已验证 1 / 缺口 1)
+- [1.1] massLimitReq  (RequirementsModel.sysml:14)
+    满足方: vehicleDesign
+    验证方: MassTest, massTest
+    派生出: chassisMassReq
+- [1.2] chassisMassReq  (RequirementsModel.sysml:35)  [缺口]
+    派生自: massLimitReq
+```
+
+三点设计：
+
+1. **稀疏列表**而不是网格——真实模型里需求成百上千，网格大半是空格子，既看不清也读不动；
+2. **按包分块**——矩阵的读者是建模的人，包是他们的工作单元；
+3. **缺口 = 既没有满足方、也没有验证方**，这是"没做"的可枚举证据，也是门禁的判据。
+
+命令行：`--matrix`（打印上面的文本）、`--gaps-only`（只留缺口的行）、`-Out <file>`（输出 JSON）、
+`--gate`（有缺口时以退出码 4 结束）。预览服务另有 `GET /matrix?gaps=1`。
+
+门禁跑在**应当没有缺口**的工作区上（清单在 `scripts/check-trace.ps1`）：
+`samples/traceability` 是正样本（每条需求都被满足且被验证），`samples/requirements`
+是反样本（故意留一条派生需求没有满足方/验证方），所以不在默认名单里。
 
 **局部视图做成产物变换，不做成渲染器功能**：`ego(ref)` 生成一个格式相同的子产物，于是
 SVG / PNG / 交互页三种出口免费都支持，不用为它写第二套渲染。
@@ -235,6 +270,18 @@ package CorpusView_<模型名> {
 
 全量 248 个模型一轮约 40 分钟，**不进 pre-commit**，作为阶段收尾的手动门禁。
 
+**S3-7 覆盖率门禁（2026-09-14）**
+
+两个方向都实测过，不是"看起来能卡住"：
+
+| 工作区 | 矩阵结果 | `--gate` 退出码 | 说明 |
+|---|---|---:|---|
+| `samples/traceability` | `requirements=2 satisfied=2 verified=2 gaps=0` | 0 | 正样本：每条需求都被满足且被验证，门禁不误报 |
+| `samples/requirements` | `requirements=2 satisfied=1 verified=1 gaps=1` | 4 | 反样本：`<'1.2'> chassisMassReq` 只有派生关系，没有满足方/验证方 |
+
+矩阵数字可复算：`gaps` 就是稀疏列表里带 `[缺口]` 的行数；`--gaps-only` 的输出与
+`--gate` 的判据同源（都读 `TraceMatrix.Matrix.gaps()`）。
+
 ## 5.3 性能校验
 
 **要测的指标**（分阶段计时，避免只有总数看不出瓶颈）：
@@ -308,6 +355,8 @@ package CorpusView_<模型名> {
 | S3-4 局部关系视图 | ✅ 已完成（`ego` 产物变换：JSON / SVG / HTML 三种出口都可用） |
 | S3-5 影响范围 | ✅ 已完成（表格页 + 源码列；默认排除 containment） |
 | S3-6 语义边（`verify` / `derive` / `perform` / `succession` / `reqId` / `documentation`） | ✅ 已完成（T0 全绿、差分不新增 missing；`succession` 有官方对照，见 `docs/ORACLE-DIFF.md`） |
+| S3-7 追溯矩阵 | ✅ 已完成（`TraceMatrix`：稀疏列表 + 按包分块 + `--gaps-only`；索引补 `reqId` / `ownerMembership` 两个字段） |
+| S3-7 覆盖率门禁 | ✅ 已完成（`--gate` 退出码 4；`scripts/check-trace.ps1` 进 pre-commit；正/反样本各一，见 §5.2.1） |
 
 ## 8. 剩余工作与执行计划（待批准）
 
@@ -322,7 +371,8 @@ package CorpusView_<模型名> {
 | 已提交并推送 | 验收底座（T1 / T2 / T4 基线 + T3 生成器）、S3-1、S3-2、S3-3/4/5；分支 `feat/model-index`（PR #17，堆叠在 #16 之上） |
 | R1 交付（已提交推送） | S3-6 的一部分：`verify` / `perform` 边、需求 `reqId`、`documentation` 仓格，含样例与 `schema` / `scripts/oracle_diff.py` 的配套改动，外加文档同步 |
 | R2 交付（本轮） | `derive`（`#derivation connection`）与 `succession`（`first A then B`）两类边；新增 `samples/actions`（ActionFlow + General 两个视图，官方有对照）；顺带修掉视图类型判定的不确定性（`Map.ofEntries` → 有序 `List`） |
-| 未开始 | S3-7（追溯矩阵 + 覆盖率门禁）、T3 全量 248、阶段收尾 |
+| R3 / R4 交付（本轮） | 追溯矩阵（`TraceMatrix` + `--matrix` / `--gaps-only` + `/matrix`）、覆盖率门禁（`--gate` 退出码 4 + `scripts/check-trace.ps1` 进 pre-commit）、新增 `samples/traceability` 正样本 |
+| 未开始 | T3 全量 248（手动跑批）、T2 复跑、T4 复测、阶段收尾（R5 / R6） |
 
 ### 8.2 剩余工作项
 

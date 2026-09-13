@@ -22,7 +22,9 @@ public final class WorkspaceIndex {
 
     public record ElementEntry(String ref,
                                String name,
+                               String reqId,
                                String metaclass,
+                               String ownerMembership,
                                String origin,
                                ElementSource source,
                                List<String> views) {

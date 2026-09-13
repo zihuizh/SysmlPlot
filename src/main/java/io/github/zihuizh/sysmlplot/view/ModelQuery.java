@@ -37,7 +37,8 @@ public final class ModelQuery {
      */
     private static final Set<String> INFLUENCE_KINDS = Set.of(
             "typing", "specialization", "subsetting", "redefinition",
-            "satisfy", "allocate", "flow", "connection");
+            "satisfy", "verify", "derive", "allocate", "flow", "connection",
+            "perform", "succession");
 
     /** 一跳邻居。{@code outgoing} 表示这条边从起点指向邻居。 */
     public record Neighbor(String ref, String name, String metaclass, String kind,

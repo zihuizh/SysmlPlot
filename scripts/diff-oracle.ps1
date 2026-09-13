@@ -15,6 +15,7 @@ $cases = @(
     @{ Workspace = 'samples/flows';          View = "FlowsViews::'power flows'";                  Label = 'flows / allocate' }
     @{ Workspace = 'samples/actions';        View = "ActionViews::'action flow'";                 Label = 'actions / flow' }
     @{ Workspace = 'samples/actions';        View = "ActionViews::'action structure'";            Label = 'actions / structure' }
+    @{ Workspace = 'samples/traceability';   View = "TraceViews::'trace coverage'";               Label = 'traceability / coverage' }
 )
 
 $scratch = Join-Path $script:BuildDir 'oracle-diff'

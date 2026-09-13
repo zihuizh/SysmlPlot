@@ -45,6 +45,9 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1                
 powershell -ExecutionPolicy Bypass -File scripts\render-png.ps1 -View "VehicleViews::'vehicle structure'" -Out build\view.png
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "StructureViews::'structure (parts)'" -Workspace samples/structure -At "samples\structure\model\StructureModel.sysml:20:20"
 powershell -ExecutionPolicy Bypass -File scripts\serve-view.ps1 -Workspace samples/structure -View "StructureViews::'structure (parts)'" -Port 8765
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -Workspace samples/requirements -Matrix          # 需求追溯矩阵
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -Workspace samples/requirements -Matrix -GapsOnly -Gate   # 覆盖率门禁（有缺口 → 退出码 4）
+powershell -ExecutionPolicy Bypass -File scripts\check-trace.ps1                              # 对"应当无缺口"的工作区跑门禁
 python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（需本机 SysON 在跑）
 ```
 
