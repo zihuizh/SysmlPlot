@@ -39,6 +39,7 @@ import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
  *        [--index &lt;file&gt;]      输出全模型索引（跨视图的关系底座，不需要 --view）
  *        [--check]             批量检查整个工作区（官方语料验收入口）
  *        [--report &lt;file&gt;]     与 --check 搭配，输出逐文件报告 JSON
+ *        [--all-views &lt;dir&gt;]   一次加载把工作区里**所有视图**各导出一份产物
  * </pre>
  *
  * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
@@ -67,6 +68,7 @@ public final class Main {
         Path indexOut = null;
         boolean check = false;
         Path reportOut = null;
+        Path allViewsOut = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -83,6 +85,7 @@ public final class Main {
                 case "--index" -> indexOut = Path.of(args[++i]);
                 case "--check" -> check = true;
                 case "--report" -> reportOut = Path.of(args[++i]);
+                case "--all-views" -> allViewsOut = Path.of(args[++i]);
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -103,6 +106,11 @@ public final class Main {
 
         if (check) {
             WorkspaceCheck.run(workspace, reportOut, loadMillis);
+            return;
+        }
+
+        if (allViewsOut != null) {
+            writeAllViews(workspace, allViewsOut);
             return;
         }
 
@@ -214,6 +222,31 @@ public final class Main {
             Files.createDirectories(target.getParent());
         }
         Files.writeString(target, content, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 一次加载导出全部视图的产物。
+     *
+     * <p>存在的理由：官方语料里的模型经常互相引用（示例是"片段"，要整批一起才解析得通），
+     * 所以验收时不能一个模型一个工作区，而是"一个语料工作区 + 遍历它所有的视图"。
+     */
+    private static void writeAllViews(SysMLWorkspace workspace, Path outDir) throws Exception {
+        Path target = outDir.toAbsolutePath();
+        Files.createDirectories(target);
+        int written = 0;
+        for (ViewUsage view : workspace.views()) {
+            String ref = view.getQualifiedName();
+            if (ref == null) {
+                continue;
+            }
+            ViewProduct.Product product = ViewProductBuilder.build(workspace, view);
+            String slug = ref.replaceAll("[^A-Za-z0-9._-]+", "-");
+            write(target.resolve(slug + ".json"), GSON.toJson(product) + "\n");
+            System.out.printf("  %-62s nodes=%d edges=%d%n",
+                    ref, product.nodes().size(), product.relationships().size());
+            written++;
+        }
+        System.out.printf("[all-views] %d view(s) written to %s%n", written, target);
     }
 
     private static void printDiagnostics(SysMLWorkspace workspace) {

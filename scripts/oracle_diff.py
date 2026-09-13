@@ -24,7 +24,9 @@ def normalize_label(label: str) -> str:
         text = text[1:]
     if ":" in text:
         text = text.split(":", 1)[0]
-    return text.strip()
+    text = text.strip()
+    # 官方会在标签上带多重性后缀（`seatBelt[2]`），这不是节点集合的差异，比较前剥掉
+    return re.sub(r"\[[^\]]*\]$", "", text).strip()
 
 
 def parse_puml(text: str):
@@ -89,4 +91,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

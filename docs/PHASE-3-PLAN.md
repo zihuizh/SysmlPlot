@@ -194,6 +194,29 @@ package CorpusView_<模型名> {
 
 11 条警告的具体内容与分布**尚未归类**，列为待办（见 `docs/PERF-BASELINE.md` 的"待补"）。
 
+**T2 官方视图验收（2026-09-14）**
+
+做法上有个关键点：**必须把整个语料当一个工作区**。官方示例是"片段"——`training/42. Views/Views Example.sysml`
+里 `expose vehicle::**` 的 `vehicle` 定义在另一个目录，单独加载那个文件夹会解析不通、暴露为零。
+所以 T2 用"一次加载 + 导出全部视图"的模式（`--all-views` / `--all-puml`），而不是一模型一工作区。
+
+| 视图 | 我方节点/边 | 官方节点/边 | 结果 |
+|---|---|---|---|
+| `11a…::'system structure generation'` | 75 / 45 | 官方拒绝渲染（`asElementTable`） | 不可比 |
+| `11b…::vehicleMandatorySafetyFeatureViewStandalone` | 51 / 45 | 官方拒绝渲染（`asElementTable`） | 不可比 |
+| `'Views Example'::'vehicle structure view'` | 13 / 12 | 13 / 21 | ✅ 节点一致（边多出的是官方重复画节点） |
+| `'Views Example'::'safety features view'` | 13 / 12 | 官方拒绝渲染（`asTextualNotationTable`） | 不可比 |
+| `SimpleVehicleModel…::vehiclePartsTree_Safety` | 3 / 0 | 3 / 0 | ✅ 一致 |
+| `11b…::vehicleMandatorySafetyFeatureView` | 2 / 0 | 2 / 0 | ✅ 一致 |
+| 其余 6 个（含 3 个 `columnView` 渲染用法） | 0 或不可比 | 同上 | 见下 |
+
+**合计：12 个官方视图里 7 个可比，零 missing。** 另外 5 个是**官方渲染器自己拒绝**——
+它只支持 TREE 与 INTERCONNECTION 两种 rendering，遇到 `asElementTable` / `asTextualNotation` /
+`asTextualNotationTable` / 自定义 rendering 直接报错。这部分没有对照物，按 §6 风险表的约定标注为"无对照"。
+
+**顺带修掉一个比较脚本的假阳性**：官方标签带多重性后缀（`seatBelt[2]`），我们标 `seatBelt`，
+第一版比对把它们算成 missing。归一化规则里补上"剥掉尾部 `[...]`"之后归零。
+
 **T3 扩面验收（2026-09-14）**
 
 | 范围 | 结果 |
@@ -277,4 +300,5 @@ package CorpusView_<模型名> {
 | T1 全量语料跑批 | ✅ 已跑（`sysml/src` 251 文件：0 错误 / 11 警告；基线见 `docs/PERF-BASELINE.md`） |
 | T4 性能基线首版 | ✅ 已建（14 / 10 / 50 / 100 / 251 五档；瓶颈在官方解析器链接，约 1 秒/文件） |
 | T3 语料视图生成器 | ✅ 已实现（`scripts/make-corpus-views.py`）；30 个模型 29/29 通过，248 全量待跑 |
+| T2 官方视图验收 | ✅ 已跑（12 个官方视图：7 个可比且零 missing；5 个官方渲染器自身不支持） |
 | S3-1 关系可导航 | ⏸ 未开始 |

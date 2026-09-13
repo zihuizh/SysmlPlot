@@ -10,7 +10,8 @@ param(
     [string]$At,
     [string]$Index,
     [switch]$Check,
-    [string]$Report
+    [string]$Report,
+    [string]$AllViews
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,6 +49,7 @@ if ($At) { $argsList += @('--at', $At) }
 if ($Index) { $argsList += @('--index', (Resolve-OutPath $Index)) }
 if ($Check) { $argsList += @('--check') }
 if ($Report) { $argsList += @('--report', (Resolve-OutPath $Report)) }
+if ($AllViews) { $argsList += @('--all-views', (Resolve-OutPath $AllViews)) }
 
 $result = Invoke-NativeCommand -Exe $script:JavaExe -Arguments $argsList
 $result.Output | ForEach-Object { Write-Host $_ }
