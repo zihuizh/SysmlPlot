@@ -20,6 +20,7 @@ import io.github.zihuizh.sysmlplot.render.SvgRenderer;
 import io.github.zihuizh.sysmlplot.view.ViewProduct;
 import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 import io.github.zihuizh.sysmlplot.view.SourceLookup;
+import io.github.zihuizh.sysmlplot.view.ModelQuery;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndex;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
 
@@ -40,6 +41,7 @@ import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
  *        [--check]             批量检查整个工作区（官方语料验收入口）
  *        [--report &lt;file&gt;]     与 --check 搭配，输出逐文件报告 JSON
  *        [--all-views &lt;dir&gt;]   一次加载把工作区里**所有视图**各导出一份产物
+ *        [--query &lt;kind&gt; --ref &lt;ref&gt; [--depth N]]  查询：neighbors / impact / views / subgraph
  * </pre>
  *
  * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
@@ -69,6 +71,9 @@ public final class Main {
         boolean check = false;
         Path reportOut = null;
         Path allViewsOut = null;
+        String query = null;
+        String queryRef = null;
+        int queryDepth = 1;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -86,6 +91,9 @@ public final class Main {
                 case "--check" -> check = true;
                 case "--report" -> reportOut = Path.of(args[++i]);
                 case "--all-views" -> allViewsOut = Path.of(args[++i]);
+                case "--query" -> query = args[++i];
+                case "--ref" -> queryRef = args[++i];
+                case "--depth" -> queryDepth = Integer.parseInt(args[++i]);
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -111,6 +119,15 @@ public final class Main {
 
         if (allViewsOut != null) {
             writeAllViews(workspace, allViewsOut);
+            return;
+        }
+
+        if (query != null) {
+            if (queryRef == null) {
+                System.err.println("--query 需要搭配 --ref");
+                System.exit(3);
+            }
+            printQuery(WorkspaceIndexBuilder.build(workspace), query, queryRef, queryDepth);
             return;
         }
 
@@ -199,6 +216,65 @@ public final class Main {
      * <p>这是"源码 → 图形"这半边联动的引擎侧实现；编辑器扩展只需把光标位置传进来即可。
      * 位置格式：{@code <path>:<line>[:<col>]}，路径可绝对或相对工作区，列从 1 开始、缺省为 1。
      */
+    /** 输出时只显示文件名，避免整条 URI 把表格撑爆。 */
+    private static String shortUri(String uri) {
+        int slash = uri.lastIndexOf('/');
+        return slash < 0 ? uri : uri.substring(slash + 1);
+    }
+
+    /** 查询入口：把索引上的遍历能力暴露给命令行，便于验证与脚本化。 */
+    private static void printQuery(WorkspaceIndex.Index index, String query, String ref, int depth) {
+        switch (query) {
+            case "neighbors" -> {
+                System.out.printf("[query] neighbors of %s%n", ref);
+                for (ModelQuery.Neighbor neighbor : ModelQuery.neighbors(index, ref)) {
+                    System.out.printf("  %-14s %s %-34s <%s>%s%n",
+                            neighbor.kind(),
+                            neighbor.outgoing() ? "\u2192" : "\u2190",
+                            neighbor.ref(),
+                            neighbor.metaclass() == null ? "?" : neighbor.metaclass(),
+                            neighbor.authored() ? "" : "  (推导)");
+                }
+            }
+            case "impact" -> {
+                System.out.printf("[query] impact of %s (反向可达, depth<=%d)%n", ref, depth);
+                List<ModelQuery.Impact> impacts = ModelQuery.impact(index, ref, depth);
+                for (ModelQuery.Impact impact : impacts) {
+                    WorkspaceIndex.ElementEntry element = ModelQuery.elementOf(index, impact.ref());
+                    String where = element == null || element.source() == null
+                            ? ""
+                            : String.format("  @%s:%d", shortUri(element.source().uri()), element.source().line());
+                    System.out.printf("  depth=%d  via %-14s %-40s <%s>%s%n",
+                            impact.depth(), impact.viaKind(), impact.ref(),
+                            impact.metaclass() == null ? "?" : impact.metaclass(),
+                            where);
+                }
+                System.out.printf("  合计 %d 个受影响元素%n", impacts.size());
+            }
+            case "views" -> {
+                System.out.printf("[query] views containing %s%n", ref);
+                for (String view : ModelQuery.viewsOf(index, ref)) {
+                    System.out.printf("  %s%n", view);
+                }
+            }
+            case "subgraph" -> {
+                ModelQuery.Subgraph subgraph = ModelQuery.subgraph(index, ref, depth);
+                System.out.printf("[query] subgraph around %s (depth<=%d): nodes=%d edges=%d%n",
+                        ref, depth, subgraph.nodes().size(), subgraph.edges().size());
+                for (String node : subgraph.nodes()) {
+                    System.out.printf("  node %s%n", node);
+                }
+                for (WorkspaceIndex.RelationEntry edge : subgraph.edges()) {
+                    System.out.printf("  edge %-14s %s -> %s%n", edge.kind(), edge.source(), edge.target());
+                }
+            }
+            default -> {
+                System.err.println("未知查询: " + query + "（可用 neighbors / impact / views / subgraph）");
+                System.exit(3);
+            }
+        }
+    }
+
     private static void printNodesAt(ViewProduct.Product product, Path workspaceRoot, String at) throws Exception {
         List<ViewProduct.NodeRef> matches = SourceLookup.nodesAt(product, workspaceRoot, at);
         System.out.printf("[at] %s%n", at);
