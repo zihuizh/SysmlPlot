@@ -20,6 +20,8 @@ import io.github.zihuizh.sysmlplot.render.SvgRenderer;
 import io.github.zihuizh.sysmlplot.view.ViewProduct;
 import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 import io.github.zihuizh.sysmlplot.view.SourceLookup;
+import io.github.zihuizh.sysmlplot.view.WorkspaceIndex;
+import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
 
 /**
  * 命令行入口。
@@ -34,6 +36,9 @@ import io.github.zihuizh.sysmlplot.view.SourceLookup;
  *        [--emit-layout &lt;file&gt;] 输出本次使用的布局
  *        [--at &lt;path:line[:col]&gt;] 反查：源码位置落在哪些节点范围内（最内层在前）
  *        [--serve &lt;port&gt;]      启动本地预览服务（交互式页面 + /cursor 光标通道）
+ *        [--index &lt;file&gt;]      输出全模型索引（跨视图的关系底座，不需要 --view）
+ *        [--check]             批量检查整个工作区（官方语料验收入口）
+ *        [--report &lt;file&gt;]     与 --check 搭配，输出逐文件报告 JSON
  * </pre>
  *
  * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
@@ -59,6 +64,9 @@ public final class Main {
         String viewRef = null;
         String at = null;
         Integer servePort = null;
+        Path indexOut = null;
+        boolean check = false;
+        Path reportOut = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -72,6 +80,9 @@ public final class Main {
                 case "--emit-layout" -> layoutOut = Path.of(args[++i]);
                 case "--at" -> at = args[++i];
                 case "--serve" -> servePort = Integer.parseInt(args[++i]);
+                case "--index" -> indexOut = Path.of(args[++i]);
+                case "--check" -> check = true;
+                case "--report" -> reportOut = Path.of(args[++i]);
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -84,10 +95,27 @@ public final class Main {
             System.exit(3);
         }
 
+        long loadStarted = System.currentTimeMillis();
         SysMLWorkspace workspace = SysMLWorkspace.load(libraryDir, workspaceDir);
+        long loadMillis = System.currentTimeMillis() - loadStarted;
         System.out.println("[workspace] " + workspace.workspaceRoot());
         System.out.println("[modelDigest] " + workspace.modelDigest());
+
+        if (check) {
+            WorkspaceCheck.run(workspace, reportOut, loadMillis);
+            return;
+        }
+
         printDiagnostics(workspace);
+
+        if (indexOut != null) {
+            WorkspaceIndex.Index index = WorkspaceIndexBuilder.build(workspace);
+            write(indexOut, GSON.toJson(index) + "\n");
+            System.out.println("[index] written to " + indexOut.toAbsolutePath());
+            System.out.printf("[index] elements=%d relations=%d%n",
+                    index.elements().size(), index.relations().size());
+            return;
+        }
 
         List<ViewUsage> views = workspace.views();
         if (viewRef == null) {

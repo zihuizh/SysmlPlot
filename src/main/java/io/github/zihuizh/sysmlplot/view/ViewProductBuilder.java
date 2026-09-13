@@ -725,8 +725,8 @@ public final class ViewProductBuilder {
         List<Edge> sorted = new ArrayList<>(edges.values());
         sorted.sort(Comparator
                 .comparing(Edge::kind)
-                .thenComparing(edge -> nodeNumber(edge.source()))
-                .thenComparing(edge -> nodeNumber(edge.target())));
+                .thenComparing(edge -> edge.source(), endComparator())
+                .thenComparing(edge -> edge.target(), endComparator()));
 
         List<ViewProduct.RelationshipRef> relationships = new ArrayList<>(sorted.size());
         for (int i = 0; i < sorted.size(); i++) {
@@ -846,6 +846,43 @@ public final class ViewProductBuilder {
 
     private static int nodeNumber(String nodeId) {
         return Integer.parseInt(nodeId.substring(1));
+    }
+
+    /**
+     * 端点排序：产物里端点是节点编号（`n1`…），索引里端点是限定名，两种都要能排。
+     * 编号按数值排（`n2` 在 `n10` 前），其余按字典序。
+     */
+    private static Comparator<String> endComparator() {
+        return (left, right) -> {
+            boolean bothIds = isNodeId(left) && isNodeId(right);
+            return bothIds
+                    ? Integer.compare(nodeNumber(left), nodeNumber(right))
+                    : left.compareTo(right);
+        };
+    }
+
+    private static boolean isNodeId(String value) {
+        if (value == null || value.length() < 2 || value.charAt(0) != 'n') {
+            return false;
+        }
+        for (int i = 1; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 供**全模型索引**复用同一套关系推导规则：键换成元素的稳定引用（`ref`）即可。
+     *
+     * <p>产物与索引共用这里，保证"索引里的关系"和"视图里的关系"永远出自同一份规则，
+     * 不会各写一套后慢慢漂移。
+     */
+    public static List<ViewProduct.RelationshipRef> deriveRelations(Map<Element, String> idByElement,
+                                                                    List<Element> connectors,
+                                                                    boolean includeConnectors) {
+        return buildRelationships(idByElement, connectors, includeConnectors);
     }
 
     private static ViewProduct.SourceRef toSourceRef(Map<Resource, Integer> documentIds, Element element) {
