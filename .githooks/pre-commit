@@ -25,7 +25,7 @@ fi
 
 # --- 1. 禁止的路径与文件类型 ------------------------------------------------
 blocked_dir='^(build|out|target|dist|node_modules|\.gradle|\.idea)/'
-blocked_ext='\.(jar|class|exe|dll|so|dylib|war|ear|zip|7z|tar|tgz|gz|bin|pdb)$'
+blocked_ext='\.(jar|class|pyc|exe|dll|so|dylib|war|ear|zip|7z|tar|tgz|gz|bin|pdb)$'
 path_bad=0
 while IFS= read -r f; do
     if [ "$f" = 'local.env.ps1' ]; then
@@ -108,4 +108,3 @@ fi
 
 printf '==> 检查通过\n'
 exit 0
-

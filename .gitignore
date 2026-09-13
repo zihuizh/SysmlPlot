@@ -4,6 +4,8 @@ out/
 target/
 *.class
 *.jar
+__pycache__/
+*.pyc
 
 # IDE
 .idea/
@@ -21,4 +23,3 @@ desktop.ini
 
 # Local machine overrides (never commit machine-specific paths)
 local.env.ps1
-
