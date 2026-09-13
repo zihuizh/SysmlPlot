@@ -149,6 +149,19 @@ public final class HtmlRenderer {
                               padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
               #layout-json { width: 100%; height: 200px; font-size: 11px; font-family: monospace;
                              border: 1px solid #e0e0e0; border-radius: 4px; resize: vertical; }
+              aside .crumbs { font-size: 11px; color: #666; margin-bottom: 8px; line-height: 1.8; }
+              aside .crumb { cursor: pointer; border-bottom: 1px dotted #bbb; }
+              aside .crumb:hover { color: #1a73e8; }
+              aside .crumb.current { color: #111; font-weight: 600; border-bottom: none; cursor: default; }
+              aside .crumb-sep { margin: 0 4px; color: #bbb; }
+              aside .relation-row { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px;
+                                    border-radius: 4px; cursor: pointer; }
+              aside .relation-row:hover { background: #eef2f8; }
+              aside .relation-kind { color: #555; }
+              aside .relation-arrow { color: #888; }
+              aside .relation-target { color: #1a73e8; }
+              aside .relation-tag { color: #999; font-size: 10px; border: 1px solid #ddd;
+                                    border-radius: 3px; padding: 0 3px; }
               .node.selected .box { stroke: #1a73e8; stroke-width: 2; }
             </style>
             </head>
@@ -157,6 +170,7 @@ public final class HtmlRenderer {
               <span class="title">__TITLE__</span>
               <span class="summary">__SUMMARY__</span>
               <span class="controls">
+                <button id="back" type="button" disabled>← 返回</button>
                 <button id="fit" type="button">适配</button>
                 <button id="reset" type="button">重置</button>
                 <button id="export-layout" type="button">导出布局</button>
@@ -170,7 +184,10 @@ public final class HtmlRenderer {
                 <ul id="outline"></ul>
               </nav>
               <div id="canvas">__SVG__</div>
-              <aside id="inspector"><p class="hint">点击节点查看元素信息</p></aside>
+              <aside id="inspector">
+                <div id="history-crumb" class="crumbs"></div>
+                <div id="inspector-body"><p class="hint">点击节点查看元素信息</p></div>
+              </aside>
             </main>
             <div id="layout-panel" hidden>
               <div class="panel-title">布局 JSON（另存为 layout.json，可用 -Layout 重新载入）</div>
@@ -186,7 +203,7 @@ public final class HtmlRenderer {
               var canvas = document.getElementById('canvas');
               var svg = canvas.querySelector('svg');
               var viewport = document.getElementById('viewport');
-              var inspector = document.getElementById('inspector');
+              var inspector = document.getElementById('inspector-body');
 
               // 让 SVG 铺满容器，使用像素坐标；缩放与平移由我们自己控制。
               svg.removeAttribute('viewBox');
@@ -312,7 +329,11 @@ public final class HtmlRenderer {
 
               svg.addEventListener('click', function (event) {
                 var group = event.target.closest('.node');
-                select(group ? group.dataset.id : null);
+                if (group) {
+                  navigateTo(group.dataset.id);
+                } else {
+                  select(null);
+                }
               });
               document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape') { select(null); }
@@ -386,17 +407,42 @@ public final class HtmlRenderer {
                 var related = product.relationships.filter(function (relationship) {
                   return relationship.source === node.id || relationship.target === node.id;
                 });
-                var text = related.length === 0
-                  ? '无出边或入边'
-                  : related.map(function (relationship) {
-                      var outgoing = relationship.source === node.id;
-                      var other = nodeById(outgoing ? relationship.target : relationship.source);
-                      var label = other ? (other.name || other.ref || other.metaclass) : '?';
-                      var arrow = outgoing ? '\u2192 ' : '\u2190 ';
-                      return relationship.kind + ' ' + arrow + label + (relationship.authored ? '' : '（推导）');
-                    }).join('\\n');
-                section.textContent = text;
-                section.style.whiteSpace = 'pre-line';
+                if (related.length === 0) {
+                  var empty = document.createElement('div');
+                  empty.className = 'hint';
+                  empty.textContent = '无出边或入边';
+                  section.appendChild(empty);
+                }
+                // 每条关系一行，点一下把中心切到对端——"查看相关元素"的核心交互
+                related.forEach(function (relationship) {
+                  var outgoing = relationship.source === node.id;
+                  var otherId = outgoing ? relationship.target : relationship.source;
+                  var other = nodeById(otherId);
+                  var row = document.createElement('div');
+                  row.className = 'relation-row';
+                  row.title = '跳转到 ' + (other && other.ref ? other.ref : otherId);
+
+                  var kind = document.createElement('span');
+                  kind.className = 'relation-kind';
+                  kind.textContent = relationship.kind;
+                  var arrow = document.createElement('span');
+                  arrow.className = 'relation-arrow';
+                  arrow.textContent = outgoing ? '\u2192' : '\u2190';
+                  var target = document.createElement('span');
+                  target.className = 'relation-target';
+                  target.textContent = other ? (other.name || other.ref || other.metaclass) : otherId;
+                  row.appendChild(kind);
+                  row.appendChild(arrow);
+                  row.appendChild(target);
+                  if (!relationship.authored) {
+                    var tag = document.createElement('span');
+                    tag.className = 'relation-tag';
+                    tag.textContent = '推导';
+                    row.appendChild(tag);
+                  }
+                  row.addEventListener('click', function () { navigateTo(otherId); });
+                  section.appendChild(row);
+                });
                 var caption = document.createElement('div');
                 caption.textContent = '关系';
                 caption.style.color = '#777';
@@ -452,8 +498,7 @@ public final class HtmlRenderer {
                 label.textContent = node.name || node.ref || node.metaclass;
                 label.title = node.ref || node.metaclass;
                 label.addEventListener('click', function () {
-                  select(node.id);
-                  centerOn(node.id);
+                  navigateTo(node.id);
                 });
                 item.appendChild(label);
                 (byParent[node.id] || []).forEach(function (child) {
@@ -487,6 +532,55 @@ public final class HtmlRenderer {
               var documentUris = JSON.parse(document.getElementById('view-documents').textContent);
               buildOutline();
               fit();
+
+              // ---- 导航历史：点关系/大纲/节点都会记一步，可逐级退回 ----
+              var history = [];
+
+              /** 把中心切到某个元素并记入历史。 */
+              function navigateTo(id) {
+                if (!id) { return; }
+                if (history[history.length - 1] !== id) { history.push(id); }
+                select(id);
+                centerOn(id);
+                renderHistory();
+              }
+
+              function goBack() {
+                if (history.length < 2) { return; }
+                history.pop();
+                var id = history[history.length - 1];
+                select(id);
+                centerOn(id);
+                renderHistory();
+              }
+
+              /** 面包屑：显示走过的元素，点任意一级跳回那一层。 */
+              function renderHistory() {
+                var bar = document.getElementById('history-crumb');
+                bar.textContent = '';
+                history.forEach(function (id, index) {
+                  if (index > 0) {
+                    var separator = document.createElement('span');
+                    separator.className = 'crumb-sep';
+                    separator.textContent = '\u203a';
+                    bar.appendChild(separator);
+                  }
+                  var node = nodeById(id);
+                  var crumb = document.createElement('span');
+                  crumb.className = 'crumb' + (index === history.length - 1 ? ' current' : '');
+                  crumb.textContent = node ? (node.name || node.ref || node.metaclass) : id;
+                  crumb.addEventListener('click', function () {
+                    history = history.slice(0, index + 1);
+                    select(id);
+                    centerOn(id);
+                    renderHistory();
+                  });
+                  bar.appendChild(crumb);
+                });
+                document.getElementById('back').disabled = history.length < 2;
+              }
+
+              document.getElementById('back').addEventListener('click', goBack);
 
               // 走 HTTP 时（`--serve`）轮询 /cursor：编辑器把光标位置发过去，这里高亮对应节点。
               // 这是"编辑器 → 图形"方向联动，做成 HTTP 通道后与具体编辑器解耦。

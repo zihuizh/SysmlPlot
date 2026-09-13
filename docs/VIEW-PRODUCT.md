@@ -319,6 +319,8 @@ onSelect(nodeId | null)   → 语义引用       // 宿主据此做属性面板�
 | 拖动节点（边界元素随所属节点移动） | `nodes[].placement` / `parent` |
 | 拖动后重算连线 | `relationships[].source/target` |
 | 导出布局（面板里给出 layout JSON） | `modelDigest` / `view.ref` / 布局对象 |
+| 关系可点击导航（点对端换中心） | `relationships[].source/target` + `nodes[].name` |
+| 导航历史（面包屑 + 后退） | 产物内的 `nodes[].id`（本地导航，不跨产物） |
 
 导出的布局可以另存为 `layout.json`，再用 `-Layout` 载入重放。闭环**已实测**：自动布局时
 `n3` 在 `(206,184)`，手工改成 `(406,284)` 后重放，渲染结果与之一致。
