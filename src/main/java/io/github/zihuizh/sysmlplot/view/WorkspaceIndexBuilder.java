@@ -134,7 +134,7 @@ public final class WorkspaceIndexBuilder {
                             : collapsed.substring(0, MAX_SNIPPET - 1) + "\u2026";
         }
         return new WorkspaceIndex.ElementSource(normalizeUri(resource.getURI().toString()),
-                node.getStartLine(), snippet);
+                node.getStartLine(), node.getOffset(), node.getLength(), snippet);
     }
 
     /** EMF 会把文件 URI 写成 `file:/D:/x`，统一成 `file:///D:/x`。 */

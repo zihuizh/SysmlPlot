@@ -17,7 +17,7 @@ public final class WorkspaceIndex {
     public static final int SCHEMA_VERSION = 0;
 
     /** 元素来源。索引跨视图，所以直接存 URI，不搞产物那套文档编号。 */
-    public record ElementSource(String uri, int line, String snippet) {
+    public record ElementSource(String uri, int line, int offset, int length, String snippet) {
     }
 
     public record ElementEntry(String ref,
@@ -41,4 +41,3 @@ public final class WorkspaceIndex {
     private WorkspaceIndex() {
     }
 }
-

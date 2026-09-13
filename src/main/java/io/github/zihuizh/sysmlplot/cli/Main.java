@@ -21,6 +21,7 @@ import io.github.zihuizh.sysmlplot.view.ViewProduct;
 import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 import io.github.zihuizh.sysmlplot.view.SourceLookup;
 import io.github.zihuizh.sysmlplot.view.ModelQuery;
+import io.github.zihuizh.sysmlplot.view.LocalViewBuilder;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndex;
 import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
 
@@ -42,6 +43,7 @@ import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
  *        [--report &lt;file&gt;]     与 --check 搭配，输出逐文件报告 JSON
  *        [--all-views &lt;dir&gt;]   一次加载把工作区里**所有视图**各导出一份产物
  *        [--query &lt;kind&gt; --ref &lt;ref&gt; [--depth N]]  查询：neighbors / impact / views / subgraph
+ *        [--local-view &lt;ref&gt;]   以某元素为中心生成**局部关系视图**（产物变换，可配 -Svg/-Html）
  * </pre>
  *
  * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
@@ -74,6 +76,7 @@ public final class Main {
         String query = null;
         String queryRef = null;
         int queryDepth = 1;
+        String localViewRef = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -94,6 +97,7 @@ public final class Main {
                 case "--query" -> query = args[++i];
                 case "--ref" -> queryRef = args[++i];
                 case "--depth" -> queryDepth = Integer.parseInt(args[++i]);
+                case "--local-view" -> localViewRef = args[++i];
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -131,6 +135,27 @@ public final class Main {
             return;
         }
 
+        // 局部关系视图：整模型取数，不受当前视图 expose 边界的限制
+        if (localViewRef != null) {
+            ViewProduct.Product local = LocalViewBuilder.build(
+                    WorkspaceIndexBuilder.build(workspace), localViewRef, queryDepth);
+            if (out == null) {
+                System.out.println(GSON.toJson(local));
+            } else {
+                write(out, GSON.toJson(local) + "\n");
+                System.out.println("[local-view] written to " + out.toAbsolutePath());
+            }
+            if (svg != null) {
+                write(svg, SvgRenderer.render(local, null).svg());
+                System.out.println("[svg] written to " + svg.toAbsolutePath());
+            }
+            if (html != null) {
+                write(html, HtmlRenderer.render(local));
+                System.out.println("[html] written to " + html.toAbsolutePath());
+            }
+            return;
+        }
+
         printDiagnostics(workspace);
 
         if (indexOut != null) {
@@ -160,7 +185,7 @@ public final class Main {
 
         if (servePort != null) {
             String pageHtml = HtmlRenderer.render(product);
-            PreviewServer.start(servePort, pageHtml, product, workspace.workspaceRoot());
+            PreviewServer.start(servePort, workspace, WorkspaceIndexBuilder.build(workspace), product, pageHtml);
             // 服务跑在后台线程上，主线程阻塞住，Ctrl+C 结束
             while (true) {
                 Thread.sleep(60_000L);

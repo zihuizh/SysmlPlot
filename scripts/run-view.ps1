@@ -14,7 +14,8 @@ param(
     [string]$AllViews,
     [string]$Query,
     [string]$Ref,
-    [int]$Depth = 1
+    [int]$Depth = 1,
+    [string]$LocalView
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,6 +55,7 @@ if ($Check) { $argsList += @('--check') }
 if ($Report) { $argsList += @('--report', (Resolve-OutPath $Report)) }
 if ($AllViews) { $argsList += @('--all-views', (Resolve-OutPath $AllViews)) }
 if ($Query) { $argsList += @('--query', $Query, '--ref', $Ref, '--depth', $Depth) }
+if ($LocalView) { $argsList += @('--local-view', $LocalView, '--depth', $Depth) }
 
 $result = Invoke-NativeCommand -Exe $script:JavaExe -Arguments $argsList
 $result.Output | ForEach-Object { Write-Host $_ }

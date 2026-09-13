@@ -339,6 +339,20 @@ GET  /cursor?path=…&line=…&col=…    设置光标位置（编辑器调用�
 检查器同步显示它的信息与关系。这样"编辑器光标 → 图上高亮"不需要绑定某个编辑器——
 VS Code 扩展、其他 IDE、一个快捷键脚本都能驱动它，编辑器侧只要发一次 HTTP 请求。
 
+服务还提供阶段 3 的三组按需接口（都只在 HTTP 下可用，`file://` 打开时前端会跳过）：
+
+| 接口 | 用途 |
+|---|---|
+| `GET /views?ref=` | 该元素出现在哪些视图（检查器里的"出现在视图"） |
+| `GET /neighbors?ref=` | 一跳邻居（JSON） |
+| `GET /impact?ref=&depth=` | 影响范围表格页（含源码位置列） |
+| `GET /local?ref=&depth=` | 以该元素为中心的**局部关系视图**（普通产物渲染） |
+| `GET /view?ref=&focus=` | 切到另一个视图并聚焦到指定元素 |
+
+局部视图是**产物变换**：`LocalViewBuilder` 把 N 跳邻域做成一份符合同一契约的产物，
+因此 SVG / PNG / 交互页三种出口对它天然可用。它的取数范围是**整个模型**而不是当前视图
+——否则点中一个元素后，若邻居没被当前视图 expose，就地找邻居会什么都找不到。
+
 > 实现上刻意用阻塞式 `ServerSocket` 手写，没用 `com.sun.net.httpserver`：后者依赖
 > `Selector`，而 `Selector` 初始化要开一对回环 socket 作唤醒管道，在受限环境里会被拒绝
 > （实测 `Selector.open()` 抛 "Unable to establish loopback connection"，而

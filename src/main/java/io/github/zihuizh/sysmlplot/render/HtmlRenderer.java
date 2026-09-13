@@ -162,6 +162,12 @@ public final class HtmlRenderer {
               aside .relation-target { color: #1a73e8; }
               aside .relation-tag { color: #999; font-size: 10px; border: 1px solid #ddd;
                                     border-radius: 3px; padding: 0 3px; }
+              aside .views { font-size: 12px; }
+              aside .view-link { display: block; color: #1a73e8; text-decoration: none;
+                                 padding: 3px 6px; border-radius: 4px; }
+              aside .view-link:hover { background: #eef2f8; }
+              aside .view-link.current { color: #111; font-weight: 600; cursor: default; }
+              aside .view-link.current::after { content: '（当前）'; color: #999; font-weight: 400; }
               .node.selected .box { stroke: #1a73e8; stroke-width: 2; }
             </style>
             </head>
@@ -174,6 +180,8 @@ public final class HtmlRenderer {
                 <button id="fit" type="button">适配</button>
                 <button id="reset" type="button">重置</button>
                 <button id="export-layout" type="button">导出布局</button>
+                <button id="local-view" type="button" disabled>局部视图</button>
+                <button id="impact" type="button" disabled>影响范围</button>
                 <label><input type="checkbox" id="hide-library"> 隐藏库元素</label>
                 <label><input type="checkbox" id="hide-implicit"> 隐藏隐式元素</label>
               </span>
@@ -349,10 +357,15 @@ public final class HtmlRenderer {
                   if (previous) { previous.classList.remove('selected'); }
                 }
                 selected = id;
-                if (!id) { inspector.innerHTML = '<p class="hint">点击节点查看元素信息</p>'; return; }
+                if (!id) {
+                  inspector.innerHTML = '<p class="hint">点击节点查看元素信息</p>';
+                  refreshActions();
+                  return;
+                }
                 var group = svg.querySelector('.node[data-id="' + id + '"]');
                 if (group) { group.classList.add('selected'); }
                 showInspector(nodeById(id));
+                refreshActions();
               }
 
               function row(list, label, value) {
@@ -449,6 +462,11 @@ public final class HtmlRenderer {
                 caption.style.marginTop = '10px';
                 inspector.appendChild(caption);
                 inspector.appendChild(section);
+
+                // 跨视图跳转只有走 HTTP 时可用（file:// 没有服务端可查）
+                if (serverMode && node.ref) {
+                  appendViewsSection(node.ref);
+                }
               }
 
               function applyFilters() {
@@ -581,6 +599,76 @@ public final class HtmlRenderer {
               }
 
               document.getElementById('back').addEventListener('click', goBack);
+
+              // ---- 服务端能力：跨视图跳转、局部视图、影响范围（只有 HTTP 下才有）----
+              var serverMode = location.protocol.indexOf('http') === 0;
+
+              function currentRef() {
+                var node = selected ? nodeById(selected) : null;
+                return node && node.ref ? node.ref : null;
+              }
+
+              function refreshActions() {
+                var enabled = serverMode && !!currentRef();
+                document.getElementById('local-view').disabled = !enabled;
+                document.getElementById('impact').disabled = !enabled;
+              }
+
+              /** 列出该元素出现的其他视图；点进去会切到那个视图并聚焦到同一元素。 */
+              function appendViewsSection(ref) {
+                var caption = document.createElement('div');
+                caption.textContent = '出现在视图';
+                caption.style.color = '#777';
+                caption.style.marginTop = '10px';
+                inspector.appendChild(caption);
+
+                var list = document.createElement('div');
+                list.className = 'views';
+                list.textContent = '查询中…';
+                inspector.appendChild(list);
+
+                fetch('/views?ref=' + encodeURIComponent(ref))
+                  .then(function (response) { return response.json(); })
+                  .then(function (views) {
+                    list.textContent = '';
+                    if (!views.length) {
+                      list.textContent = '没有出现在任何视图里';
+                      return;
+                    }
+                    views.forEach(function (viewRef) {
+                      var link = document.createElement('a');
+                      link.className = 'view-link';
+                      link.textContent = viewRef;
+                      var isCurrent = viewRef === product.view.ref;
+                      link.href = '/view?ref=' + encodeURIComponent(viewRef)
+                        + '&focus=' + encodeURIComponent(ref);
+                      if (isCurrent) { link.classList.add('current'); }
+                      list.appendChild(link);
+                    });
+                  })
+                  .catch(function () { list.textContent = '查询失败'; });
+              }
+
+              document.getElementById('local-view').addEventListener('click', function () {
+                var ref = currentRef();
+                if (ref) { window.open('/local?ref=' + encodeURIComponent(ref) + '&depth=1', '_blank'); }
+              });
+
+              document.getElementById('impact').addEventListener('click', function () {
+                var ref = currentRef();
+                if (ref) { window.open('/impact?ref=' + encodeURIComponent(ref) + '&depth=2', '_blank'); }
+              });
+
+              // 从别的视图跳过来时带着 focus=<ref>，落地就选中并居中
+              var focusRef = new URLSearchParams(location.search).get('focus');
+              if (focusRef) {
+                var focusNode = product.nodes.find(function (item) { return item.ref === focusRef; });
+                if (focusNode) {
+                  select(focusNode.id);
+                  centerOn(focusNode.id);
+                }
+              }
+              refreshActions();
 
               // 走 HTTP 时（`--serve`）轮询 /cursor：编辑器把光标位置发过去，这里高亮对应节点。
               // 这是"编辑器 → 图形"方向联动，做成 HTTP 通道后与具体编辑器解耦。
