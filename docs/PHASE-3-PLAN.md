@@ -166,7 +166,7 @@ S3-2 是关键路径：S3-3/4/5/7 都挂在它上面。S3-1 与 S3-6 可与它�
 
 | 层级 | 范围 | 跑法 | 通过标准 | 频率 |
 |---|---|---|---|---|
-| **T0 样例回归** | `samples/` 的 7 个自建样例、14 个文件 | `scripts/diff-oracle.ps1` + 确定性比对 + schema 校验 | 与官方渲染零 missing；两次运行产物逐字节一致；全部过 schema | 每次提交（pre-commit 已覆盖样例校验部分） |
+| **T0 样例回归** | `samples/` 的 9 个自建样例、18 个文件（12 个视图） | `scripts/diff-oracle.ps1` + 确定性比对 + schema 校验 + `scripts/check-trace.ps1` | 与官方渲染零 missing；两次运行产物逐字节一致；全部过 schema；应当无缺口的工作区真的没有缺口 | 每次提交（pre-commit 覆盖样例校验与覆盖率门禁） |
 | **T1 语料解析验收** | 官方 SysML v2 Release 全量 403 个 `.sysml`/`.kerml` | `run-view.ps1 -Workspace <corpus> -Check -Report …` | 逐文件错误数可复算；与官方工具 `validate` 的差异逐条解释 | 手动 / 每个工作项收尾 |
 | **T2 官方视图验收** | 语料里含 `view`/`expose` 的 5 个模型 | 生成产物 + 与官方 PUML 差分 | 零 missing；产物两次一致 | 手动 / 阶段收尾 |
 | **T3 扩面验收** | 语料里**没有 view** 的 246 个模型 | 自动生成 view 包装（见 5.2）+ T2 同样的检查 | 全部能生成产物；与官方渲染一致或差异可解释 | 手动 / 阶段收尾 |
@@ -229,6 +229,9 @@ package CorpusView_<模型名> {
 
 11 条警告的具体内容与分布**尚未归类**，列为待办（见 `docs/PERF-BASELINE.md` 的"待补"）。
 
+**复跑（2026-09-14，阶段 3 收尾）**：`sysml/src` 251 文件仍是 **0 错误 / 11 警告**，
+load 242.3s、check 9.2s——与首次一致，说明阶段 3 的改动没有碰坏解析与语义校验。
+
 **T2 官方视图验收（2026-09-14）**
 
 做法上有个关键点：**必须把整个语料当一个工作区**。官方示例是"片段"——`training/42. Views/Views Example.sysml`
@@ -252,6 +255,22 @@ package CorpusView_<模型名> {
 **顺带修掉一个比较脚本的假阳性**：官方标签带多重性后缀（`seatBelt[2]`），我们标 `seatBelt`，
 第一版比对把它们算成 missing。归一化规则里补上"剥掉尾部 `[...]`"之后归零。
 
+**复跑（2026-09-14，阶段 3 收尾，12 个视图）**：
+
+| 视图 | 我方节点/边 | 官方节点/边 | 结果 |
+|---|---|---|---|
+| `'Views Example'::'vehicle structure view'` | 13 / 12 | 13 / 21 | ✅ 节点一致 |
+| `SimpleVehicleModel…::vehiclePartsTree_Safety` | 3 / 0 | 3 / 0 | ✅ 一致 |
+| `11b…::vehicleMandatorySafetyFeatureView` | 2 / 0 | 2 / 0 | ✅ 一致 |
+| `11a…::'system structure generation'` | 38 / 45 | 0 / 0（`asElementTable`，官方拒绝渲染） | 无对照 |
+| `11b…::vehicleMandatorySafetyFeatureViewStandalone` | 21 / 45 | 0 / 0（同上） | 无对照 |
+| `'Views Example'::'safety features view'` 等 | 13 / 12 或 0 | 0 / 0（`asTextualNotationTable` / `columnView`） | 无对照 |
+
+**合计 12 个视图，零 missing。** 三处节点数与首跑不同，原因已定位且是**改进**：阶段 3 把
+`ConstraintUsage` 从节点展开里排除（约束按官方行为进 `constraints` 仓格），于是两个表格类视图
+不再把约束的表达式子树（`Invariant` / `OperatorExpression` / `LiteralInteger` / 匿名多重性…）
+物化成节点——`75 → 38`、`51 → 21` 掉的就是这些。
+
 **T3 扩面验收（2026-09-14）**
 
 | 范围 | 结果 |
@@ -268,7 +287,24 @@ package CorpusView_<模型名> {
 2. **每个模型要复制整个目录**，不能只复制单个文件——同目录的语料经常互相 import，
    只挑一个文件出来会立刻断链（实测 10 个里挂 5 个，改成整目录复制后 10/10）。
 
-全量 248 个模型一轮约 40 分钟，**不进 pre-commit**，作为阶段收尾的手动门禁。
+**全量复跑（2026-09-14，产物级）**
+
+用 `scripts/make-corpus-views.py --out build/corpus-views --run-views` 跑完整语料：
+**248 个工作区里 211 个零错误出产物**。剩下 37 个的失败原因**不是我们的工具**，而是
+语料本身的"片段化"——这些模型 import 的包在**别的目录**里（例如 `Camera.sysml` 依赖
+`'Action Decomposition'`、`Flow Usage Example.sysml` 依赖 `'Port Example'`），
+而 T3 按目录建工作区，跨目录的 import 自然断链。
+
+这 37 个**全部**用 `--compare-only` 与官方 `validate` 做了逐文件错误数比对：
+**37 / 37 完全一致**（例：`Camera` 15=15、`Interface-Example` 13=13、
+`Flow-Usage-Example` 48=48）。
+
+这也正是计划里给 T1 定的判定标准——**"与官方诊断一致"，不要求零错误**。
+
+> 资源代价（用户实测后补记到 `AGENTS.md`）：一轮全量约 55–65 分钟，单进程常驻
+> 700MB–1GB，风扇长时间满载。跑批前要先告知，并把驱动进程降到 `BelowNormal`。
+
+全量 248 个模型不进 pre-commit，作为阶段收尾的手动门禁。
 
 **S3-7 覆盖率门禁（2026-09-14）**
 
@@ -372,7 +408,8 @@ package CorpusView_<模型名> {
 | R1 交付（已提交推送） | S3-6 的一部分：`verify` / `perform` 边、需求 `reqId`、`documentation` 仓格，含样例与 `schema` / `scripts/oracle_diff.py` 的配套改动，外加文档同步 |
 | R2 交付（本轮） | `derive`（`#derivation connection`）与 `succession`（`first A then B`）两类边；新增 `samples/actions`（ActionFlow + General 两个视图，官方有对照）；顺带修掉视图类型判定的不确定性（`Map.ofEntries` → 有序 `List`） |
 | R3 / R4 交付（本轮） | 追溯矩阵（`TraceMatrix` + `--matrix` / `--gaps-only` + `/matrix`）、覆盖率门禁（`--gate` 退出码 4 + `scripts/check-trace.ps1` 进 pre-commit）、新增 `samples/traceability` 正样本 |
-| 未开始 | T3 全量 248（手动跑批）、T2 复跑、T4 复测、阶段收尾（R5 / R6） |
+| R5 进行中 | T3 全量已跑（211 / 248 零错误出产物，37 个为语料跨目录 import 断链，与官方诊断逐文件比对中）；T2 复跑完成（12 视图零 missing）；T1 复跑完成（251 文件 0 错误 / 11 警告） |
+| 未开始 | T4 复测（含索引与矩阵两个新阶段）、阶段收尾（R6：BACKLOG / ROADMAP / README / PR） |
 
 ### 8.2 剩余工作项
 

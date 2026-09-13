@@ -3,7 +3,7 @@
 记录当前**已知但尚未做**的事情，避免依赖记忆。每项做完后从本文件移除，结论进对应文档
 （契约进 `docs/VIEW-PRODUCT.md`，实测事实进 `docs/PHASE-1-FINDINGS.md`）。
 
-更新日期：2026-09-10
+更新日期：2026-09-14
 
 ## 阶段 1 剩余项（按依赖顺序）
 
@@ -11,15 +11,16 @@
 
 `containment` / `typing` / `specialization` / `subsetting` / `redefinition` 五类已实现，
 来源见 `docs/VIEW-PRODUCT.md` 第 3 节。验证样例：`samples/structure`。
-仍待补的语义边：`satisfy`、`verify`、`allocate`、`flow`、`connection`。
+后续补齐（阶段 2、阶段 3）：`satisfy`、`allocate`、`flow`、`connection`、`verify`、
+`derive`、`perform`、`succession` 全部完成，来源与对照情况见 `docs/VIEW-PRODUCT.md` 第 3 节
+与 `docs/ORACLE-DIFF.md`。**语义边这一项可以关掉了**。
 
 ### 2. 按视图类型分投影（部分完成）
 
 - ✅ **Interconnection**：连接器变边、端口贴节点边界（`view.kind` + `placement` + `connection`）
-- ❌ **Action Flow**：动作/控制节点 + 有序流边（现在按 interconnection 规则处理，够用但不完整）
+- 🟡 **Action Flow**：动作是节点、`succession` 与 `flow` 是边（已完成，样例 `samples/actions`）；
+  控制节点（fork/join/decision/merge）、守卫与 trigger 仍未做
 - ❌ **State Transition**：状态节点 + 带 trigger/guard/effect 的迁移边
-
-仍待补的语义边：`verify`（`connection`、`satisfy`、`allocate`、`flow` 已完成）。
 
 注：Action Flow 与 State Transition 在标准库里特化自 InterconnectionView，目前判定为各自的
 `kind` 但投影走 interconnection 规则；两者的专有节点/边规则尚未实现。
@@ -30,8 +31,8 @@
 - ✅ **源码联动（单向）**：`source.snippet` 带原文片段，交互式页面里可显示来源并跳转编辑器
   （`vscode://file/<path>:<line>`）
 - ❌ **反向联动**：编辑器光标位置驱动图上高亮，需要编辑器宿主（VS Code 扩展或 LSP 客户端）
-- ❌ 仓格里的 `documentation`（doc 文本）尚未收入；官方在 `VCompartment.addDocumentation` 里
-  有专门处理，doc 通常占用节点下方的独立区域
+- ✅ 仓格里的 `documentation`（doc 文本）已收入，单独成一格（对齐官方
+  `VCompartment.addDocumentation` 把 doc 放在节点下方独立区域的做法）
 
 ### 4. 端口方向（新）
 
@@ -78,5 +79,5 @@
 | 项 | 说明 |
 |---|---|
 | 功能分支清理 | `feat/pilot-parser-spike`、`feat/view-product`、`feat/svg-renderer`、`feat/interactive-renderer` 已合并且本地/远端都还在，待统一删除 |
-| pre-commit 未覆盖产物回归 | 钩子目前只做"样例能通过官方解析器校验"，还没有比对产物与渲染结果 |
+| pre-commit 未覆盖产物回归 | 钩子目前做样例解析校验 + 覆盖率门禁；产物与渲染结果的回归比对还没进钩子（全量太慢） |
 | 没有单元测试框架 | 验证目前靠命令行脚本 + 人工比对，尚未引入测试目录与断言 |

@@ -66,6 +66,15 @@ public final class TraceMatrix {
 
     /** 全模型建矩阵。 */
     public static Matrix build(WorkspaceIndex.Index index) {
+        // 先按端点建索引再取数：直接对每个元素扫全部关系是 O(元素 × 关系)，
+        // 在官方语料那种规模（几千元素、几千关系）上会明显变慢。
+        Map<String, List<WorkspaceIndex.RelationEntry>> incoming = new LinkedHashMap<>();
+        Map<String, List<WorkspaceIndex.RelationEntry>> outgoing = new LinkedHashMap<>();
+        for (WorkspaceIndex.RelationEntry relation : index.relations()) {
+            incoming.computeIfAbsent(relation.target(), key -> new ArrayList<>()).add(relation);
+            outgoing.computeIfAbsent(relation.source(), key -> new ArrayList<>()).add(relation);
+        }
+
         List<Row> rows = new ArrayList<>();
 
         for (WorkspaceIndex.ElementEntry element : index.elements()) {
@@ -79,16 +88,17 @@ public final class TraceMatrix {
             List<String> verifiedBy = new ArrayList<>();
             List<String> derivedFrom = new ArrayList<>();
             List<String> derivedBy = new ArrayList<>();
-            for (WorkspaceIndex.RelationEntry relation : index.relations()) {
-                if (element.ref().equals(relation.target())) {
-                    switch (relation.kind()) {
-                        case "satisfy" -> satisfiedBy.add(relation.source());
-                        case "verify" -> verifiedBy.add(relation.source());
-                        case "derive" -> derivedBy.add(relation.source());
-                        default -> {
-                        }
+            for (WorkspaceIndex.RelationEntry relation : incoming.getOrDefault(element.ref(), List.of())) {
+                switch (relation.kind()) {
+                    case "satisfy" -> satisfiedBy.add(relation.source());
+                    case "verify" -> verifiedBy.add(relation.source());
+                    case "derive" -> derivedBy.add(relation.source());
+                    default -> {
                     }
-                } else if (element.ref().equals(relation.source()) && "derive".equals(relation.kind())) {
+                }
+            }
+            for (WorkspaceIndex.RelationEntry relation : outgoing.getOrDefault(element.ref(), List.of())) {
+                if ("derive".equals(relation.kind())) {
                     derivedFrom.add(relation.target());
                 }
             }

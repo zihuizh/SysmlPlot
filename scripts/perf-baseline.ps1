@@ -41,15 +41,31 @@ foreach ($scale in $scaleList) {
     $wall = $sw.Elapsed.TotalSeconds
 
     $json = Get-Content $report -Raw | ConvertFrom-Json
+
+    # 阶段 3 新增的两段：索引构建与追溯矩阵。两者都包含固定的加载成本，
+    # 看净耗时用"wall - loadSeconds"。
+    $sw.Restart()
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'run-view.ps1') `
+        -Workspace $target -Index (Join-Path $script:BuildDir "perf-$scale.index.json") 2>&1 | Out-Null
+    $indexWall = $sw.Elapsed.TotalSeconds
+
+    $sw.Restart()
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'run-view.ps1') `
+        -Workspace $target -Matrix 2>&1 | Out-Null
+    $matrixWall = $sw.Elapsed.TotalSeconds
+
     $rows += [pscustomobject]@{
         files        = $json.summary.files
         errors       = $json.summary.errors
         warnings     = $json.summary.warnings
         loadSeconds  = [Math]::Round($json.summary.loadMillis / 1000.0, 1)
         checkSeconds = [Math]::Round($json.summary.checkMillis / 1000.0, 1)
+        indexSeconds = [Math]::Round($indexWall, 1)
+        matrixSeconds = [Math]::Round($matrixWall, 1)
         wallSeconds  = [Math]::Round($wall, 1)
     }
-    Write-Host ("  {0,4} 文件  load={1,6}s  check={2,5}s  wall={3,6}s" -f $scale, $rows[-1].loadSeconds, $rows[-1].checkSeconds, $rows[-1].wallSeconds)
+    Write-Host ("  {0,4} 文件  load={1,6}s  check={2,5}s  index={3,6}s  matrix={4,6}s  wall={5,6}s" -f `
+        $scale, $rows[-1].loadSeconds, $rows[-1].checkSeconds, $rows[-1].indexSeconds, $rows[-1].matrixSeconds, $rows[-1].wallSeconds)
 }
 
 Write-Host ''
