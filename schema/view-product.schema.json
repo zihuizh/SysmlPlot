@@ -125,7 +125,8 @@
         "kind": {
           "enum": [
             "containment", "typing", "specialization", "subsetting", "redefinition",
-            "connection", "satisfy", "verify", "allocate", "flow", "perform"
+            "connection", "satisfy", "verify", "derive", "allocate", "flow", "perform",
+            "succession"
           ]
         },
         "source": { "type": "string", "pattern": "^n[0-9]+$" },

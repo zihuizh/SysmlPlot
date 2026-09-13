@@ -7,5 +7,6 @@ package RequirementsViews {
         expose massLimitReq;
         expose massTest;
         expose MassLimit;
+        expose chassisMassReq;
     }
 }

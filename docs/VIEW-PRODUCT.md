@@ -189,14 +189,23 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `connection` | 连接（`connect` / connection usage） | 连接器的另一个端点 |
 | `satisfy` | 满足需求（`satisfy X;`） | 被满足的需求 |
 | `verify` | 验证需求（`objective { verify X; }`） | 被验证的需求 |
+| `derive` | 需求派生（`#derivation connection` 的 `#derive` 端） | 原需求（派生需求的来源） |
 | `allocate` | 分配（`allocate x to y;`） | 被分配到的目标 |
 | `flow` | 流（`flow of T from a to b;`） | 流的终点 |
 | `perform` | 执行动作（`perform X;`） | 被执行的动作用法 |
+| `succession` | 时序（`first A then B;` / `then B;`） | 后继动作 |
 
 出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
-补节点。语义关系（`connection` / `satisfy` / `verify` / `allocate` / `flow` / `perform`）
-只画文本里写出来的，隐式推导的不画；`containment` 两者都画，由 `authored` 如实标记。
-后续计划补 `derive`（需求派生）与 `succession`（`first A then B`）。
+补节点。`typing` / `specialization` / `subsetting` / `redefinition` 只画文本里写出来的，
+隐式推导的不画；`containment` 两者都画，由 `authored` 如实标记。
+
+两条边不止一个来源，判定方式写在实现里，这里记要点：
+
+- `derive` 不是关键字，而是标准库 `RequirementDerivation` 的元数据
+  （`#derivation connection` + 端上的 `#original` / `#derive`）。承载它的连接器**不必**是本
+  视图的节点——它连的是两个需求，只要两端在，边就成立；查找范围是各节点所属的命名空间。
+- `succession` 来自 `Succession`（`first A then B`、`then B`、`succession s first A then B`），
+  端点取 `getSource()` / `getTarget()`，与官方行为渲染（`VBehavior.addSuccession`）一致。
 
 ### 3.1 按视图类型的投影规则
 
@@ -204,8 +213,12 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 
 | 视图类型 | 投影差异 |
 |---|---|
-| `general` 及一切 `unclassified` | 所有暴露元素都是节点；连接器也是节点 |
-| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是 `connection` 边**；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
+| `general` 及一切 `unclassified` | 所有暴露元素都是节点；**被显式暴露**的连接器也是节点，其余连接器仍然画成边 |
+| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是边**（`connection` / `flow` / `allocate` / `succession`）；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
+
+连接器的统一规则是**要么是节点、要么是边**，不会两者都是——否则同一个事实会被画两遍。
+`general` 视图里只有显式暴露的连接器是节点；由递归展开发现的那些（例如动作内部的
+`first A then B`）仍然画成边。
 
 端口贴在哪个节点上：优先端口属主本身（若已投影）；否则找"类型闭包包含该属主"的用法节点
 ——`tank : Tank` 上的端口来自 `Tank`，在互联视图里画在 `tank` 的边界上。

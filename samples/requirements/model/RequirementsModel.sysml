@@ -1,5 +1,6 @@
 package RequirementsModel {
     private import ScalarValues::*;
+    private import RequirementDerivation::*;
 
     requirement def MassLimit {
         doc /* 车辆总质量不得超过限制 */
@@ -29,4 +30,14 @@ package RequirementsModel {
     }
 
     verification massTest : MassTest;
+
+    // 派生需求：底盘质量需求由整车质量需求派生而来
+    requirement <'1.2'> chassisMassReq : MassLimit {
+        attribute :>> massLimit = 900;
+    }
+
+    #derivation connection {
+        end #original ::> massLimitReq;
+        end #derive ::> chassisMassReq;
+    }
 }

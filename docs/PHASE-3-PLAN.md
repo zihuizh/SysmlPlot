@@ -13,7 +13,7 @@
 | # | 问题 | 现在能答吗 |
 |---|---|---|
 | 1 | 需求 X 由哪些部件满足？ | ✅ `satisfy` 边反向查 |
-| 2 | 部件 P 的行为链是什么？ | 🟡 有 `allocate`/`flow`/`perform`，缺 `succession` |
+| 2 | 部件 P 的行为链是什么？ | ✅ `allocate` / `flow` / `perform` / `succession` 四类边齐备 |
 | 3 | 改动元素 E 会影响哪些需求？ | ❌ 缺逆向可达查询 |
 | 4 | 哪些需求没有任何实现或验证？ | ❌ 缺覆盖率校验 |
 | 5 | 同一元素出现在哪些视图里？ | ✅ 已验证（同一 ref 出现在 3 个视图） |
@@ -121,7 +121,7 @@ S3-2 是关键路径：S3-3/4/5/7 都挂在它上面。S3-1 与 S3-6 可与它�
 | S3-3 | 检查器列出该元素出现的全部视图；点击后页面切到那个视图且中心仍是该元素 |
 | S3-4 | 局部视图节点集 = 中心 + N 跳邻居；去掉任意一条边后重算结果一致；三种导出都能用 |
 | S3-5 | 改动一个部件能列出受影响的需求并给出各自源码位置；隐式/库元素默认不出现在结果里 |
-| S3-6 | 四类新边在样例上与官方渲染**零 missing**；无法对照的部分要写清依据 |
+| S3-6 | 四类新边在样例上与官方渲染**零 missing**；无法对照的部分要写清依据（`succession` 在动作视图里有官方对照，见 `docs/ORACLE-DIFF.md`） |
 | S3-7 | 覆盖率数字可复算；未实现/未验证需求可枚举；门禁在样例上能卡住有缺口的模型 |
 
 ## 5.1 测试层级
@@ -307,7 +307,7 @@ package CorpusView_<模型名> {
 | S3-3 跨视图跳转 | ✅ 已完成（检查器列出所在视图；点击切视图并聚焦同一元素，已截图验证） |
 | S3-4 局部关系视图 | ✅ 已完成（`ego` 产物变换：JSON / SVG / HTML 三种出口都可用） |
 | S3-5 影响范围 | ✅ 已完成（表格页 + 源码列；默认排除 containment） |
-| S3-6 语义边（`verify` / `perform` / `reqId` / `documentation`） | 🟡 已实现并验证（T0 全绿、差分不新增 missing）；`derive` / `succession` 待做 |
+| S3-6 语义边（`verify` / `derive` / `perform` / `succession` / `reqId` / `documentation`） | ✅ 已完成（T0 全绿、差分不新增 missing；`succession` 有官方对照，见 `docs/ORACLE-DIFF.md`） |
 
 ## 8. 剩余工作与执行计划（待批准）
 
@@ -320,8 +320,9 @@ package CorpusView_<模型名> {
 | 类别 | 内容 |
 |---|---|
 | 已提交并推送 | 验收底座（T1 / T2 / T4 基线 + T3 生成器）、S3-1、S3-2、S3-3/4/5；分支 `feat/model-index`（PR #17，堆叠在 #16 之上） |
-| R1 交付（本次提交） | S3-6 的一部分：`verify` / `perform` 边、需求 `reqId`、`documentation` 仓格，含两个样例、`schema/view-product.schema.json` 与 `scripts/oracle_diff.py` 的配套改动，外加 `VIEW-PRODUCT.md` / `ORACLE-DIFF.md` 同步 |
-| 未开始 | S3-6 剩余（`derive` / `succession`）、S3-7（追溯矩阵 + 覆盖率门禁）、T3 全量 248、阶段收尾 |
+| R1 交付（已提交推送） | S3-6 的一部分：`verify` / `perform` 边、需求 `reqId`、`documentation` 仓格，含样例与 `schema` / `scripts/oracle_diff.py` 的配套改动，外加文档同步 |
+| R2 交付（本轮） | `derive`（`#derivation connection`）与 `succession`（`first A then B`）两类边；新增 `samples/actions`（ActionFlow + General 两个视图，官方有对照）；顺带修掉视图类型判定的不确定性（`Map.ofEntries` → 有序 `List`） |
+| 未开始 | S3-7（追溯矩阵 + 覆盖率门禁）、T3 全量 248、阶段收尾 |
 
 ### 8.2 剩余工作项
 
