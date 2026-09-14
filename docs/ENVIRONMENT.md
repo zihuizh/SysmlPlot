@@ -21,7 +21,7 @@ OMG Pilot 的构建产物编译目标是 Java 21（class file version 65）。�
 | 工具 | 版本 | 备注 |
 |---|---|---|
 | git | 已安装 | 仓库身份 `ZhangZiHui <1564587746@qq.com>` |
-| Node.js | v24.19.0 | 后续可用于 ELK 布局 |
+| Node.js | v24.19.0 | 用于图库框架原型、构建与相关工具 |
 | Python | 3.11.0 | 脚本与校验 |
 | Graphviz `dot` | 已安装 | `C:\Program Files\Graphviz\bin\dot.exe`，可作确定性布局与渲染 |
 | Maven / Gradle | 未安装 | 构建暂不依赖它们，见下 |
