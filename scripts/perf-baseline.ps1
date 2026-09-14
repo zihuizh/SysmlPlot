@@ -31,7 +31,12 @@ foreach ($scale in $scaleList) {
     if (Test-Path $target) { Remove-Item $target -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $target | Out-Null
     foreach ($file in ($all | Select-Object -First $scale)) {
-        Copy-Item -LiteralPath $file -Destination $target
+        # 保留相对目录结构：语料里存在**同名不同目录**的文件，摊平复制会互相覆盖，
+        # 实测 "251 档"因此少了一个文件（报告 files=250），也丢失了目录语义。
+        $relative = $file.Substring($Corpus.Length).TrimStart('\', '/')
+        $destination = Join-Path $target $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+        Copy-Item -LiteralPath $file -Destination $destination
     }
 
     $report = Join-Path $script:BuildDir "perf-$scale.json"
