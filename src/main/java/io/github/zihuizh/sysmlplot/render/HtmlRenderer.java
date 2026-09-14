@@ -310,17 +310,36 @@ public final class HtmlRenderer {
                 canvas.classList.remove('dragging');
               });
 
+              /**
+               * 连线的正交走线：从源框朝向目标的那条边的中点，接到目标框朝向源的那条边的中点。
+               *
+               * 这段是 SvgRenderer.route() 的**镜像**（拖动节点后要重算连线），改一处必须改另一处。
+               */
+              function routePath(source, target) {
+                var scx = source.x + source.width / 2, scy = source.y + source.height / 2;
+                var tcx = target.x + target.width / 2, tcy = target.y + target.height / 2;
+                var dx = tcx - scx, dy = tcy - scy;
+                if (Math.abs(dx) >= Math.abs(dy)) {
+                  var x1 = dx >= 0 ? source.x + source.width : source.x;
+                  var x2 = dx >= 0 ? target.x : target.x + target.width;
+                  var midX = (x1 + x2) / 2;
+                  return 'M ' + x1 + ' ' + scy + ' L ' + midX + ' ' + scy
+                    + ' L ' + midX + ' ' + tcy + ' L ' + x2 + ' ' + tcy;
+                }
+                var y1 = dy >= 0 ? source.y + source.height : source.y;
+                var y2 = dy >= 0 ? target.y : target.y + target.height;
+                var midY = (y1 + y2) / 2;
+                return 'M ' + scx + ' ' + y1 + ' L ' + scx + ' ' + midY
+                  + ' L ' + tcx + ' ' + midY + ' L ' + tcx + ' ' + y2;
+              }
+
               /** 节点位置变了就重算连线（端口附着不画线，因此这里只处理真实边）。 */
               function routeEdges() {
                 svg.querySelectorAll('.edge').forEach(function (path) {
                   var source = layout.nodes[path.dataset.source];
                   var target = layout.nodes[path.dataset.target];
                   if (!source || !target) { return; }
-                  var x1 = source.x + source.width / 2, y1 = source.y + source.height;
-                  var x2 = target.x + target.width / 2, y2 = target.y;
-                  var midY = (y1 + y2) / 2;
-                  path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' L ' + x1 + ' ' + midY
-                    + ' L ' + x2 + ' ' + midY + ' L ' + x2 + ' ' + y2);
+                  path.setAttribute('d', routePath(source, target));
                 });
               }
               canvas.addEventListener('wheel', function (event) {
