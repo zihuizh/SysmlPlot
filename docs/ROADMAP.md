@@ -6,7 +6,7 @@
 - 摸清本机环境与可复用资产（见 `docs/ENVIRONMENT.md`）
 - 初始化仓库
 
-## 阶段 1 · 解析与视图生成（当前）
+## 阶段 1 · 解析与视图生成（已完成）
 
 **目标**：使用 OMG 官方解析器（SysML v2 Pilot Implementation）解析 SysML v2 文本，
 并按照标准的 `view` / `expose` 机制生成视图。
@@ -64,6 +64,7 @@
 - ✅ 跨视图跳转、局部关系视图、影响范围分析
 - ✅ 需求追溯矩阵与覆盖率门禁（含正/反样本）
 - ✅ 补齐语义边：`verify` / `derive` / `perform` / `succession`
+- ✅ 产物回归：期望产物入库（`tests/golden`）+ 提交前检查（`scripts/check-products.ps1`）
 
 原有的"行为视图专有规则、大模型懒加载、快照回归与布局稳定性"下沉为本阶段的支撑项，
 记在 `docs/BACKLOG.md`。

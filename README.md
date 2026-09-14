@@ -53,6 +53,7 @@ powershell -ExecutionPolicy Bypass -File scripts\serve-view.ps1 -Workspace sampl
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -Workspace samples/requirements -Matrix          # 需求追溯矩阵
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -Workspace samples/requirements -Matrix -GapsOnly -Gate   # 覆盖率门禁（有缺口 → 退出码 4）
 powershell -ExecutionPolicy Bypass -File scripts\check-trace.ps1                              # 对"应当无缺口"的工作区跑门禁
+powershell -ExecutionPolicy Bypass -File scripts\check-products.ps1                           # 产物回归：期望产物 + schema + 确定性
 python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（需本机 SysON 在跑）
 ```
 
@@ -70,10 +71,12 @@ python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（�
 
 ## 当前状态
 
-阶段 0（评估）、阶段 1（解析与视图生成）、阶段 2（可用 MVP）已完成并合并进 `main`。
-阶段 3 正在收尾——**模型查询与追溯**：全模型索引、关系导航、跨视图跳转、局部关系视图、
-影响范围分析、需求追溯矩阵与覆盖率门禁都已实现（分支 `feat/model-index`），
-正在跑全量语料验收（T3）与性能复测（T4）。
+阶段 0（评估）、阶段 1（解析与视图生成）、阶段 2（可用 MVP）、阶段 3（**模型查询与追溯**）
+都已完成并合并进 `main`：全模型索引、关系导航、跨视图跳转、局部关系视图、影响范围分析、
+需求追溯矩阵与覆盖率门禁，外加 T0–T4 五层验收记录。
+
+下一步是阶段 4（双向编辑），尚未开始；阶段 3 的支撑项（布局按视图类型分化、增量产物、
+行为视图专有规则等）记在 `docs/BACKLOG.md`。
 
 ## 关键约束
 

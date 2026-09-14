@@ -44,7 +44,7 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 
 ## 当前结果（2026-09-14）
 
-十一个样例视图的节点名集合**无 missing**：
+十二个样例视图的节点名集合**无 missing**：
 
 | 样例 | 官方节点 | 我方节点 | 官方边 | 我方边 |
 |---|---:|---:|---:|---:|
@@ -59,6 +59,7 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 | flows / allocate（`flow` + `allocate`） | 8 | 9 | 10 | 6 |
 | actions / flow（`succession` + `flow`） | 5 | 7 | 3 | 6 |
 | actions / structure（同一模型，General 视图） | 5 | 7 | 3 | 6 |
+| bindings / power binding（`bind`） | 3 | 3 | 3 | 1 |
 
 "官方节点"已按标签去重；我方多出的部分是**已知差异**里的表示选择，不是漏画：
 `interconnection` 多 `fuelSupply`（第 7 条）、`requirements` 多 `testVehicle`
@@ -72,6 +73,7 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 | `satisfy` | 有 | `requirements` 样例：官方画 `«satisfy»` 边 |
 | `allocate` / `flow` | 有 | `flows` 样例：官方画粗点线边与 `from`/`to` 边 |
 | `succession` | **有**（本轮新发现） | `samples/actions` 的 ActionFlow 视图：官方画出 `setup --> focus`、`focus --> shoot`（后者带 `focusThenShoot` 标签），与我们的一一对应 |
+| `binding` | **有** | `samples/bindings` 的 Interconnection 视图：官方画出 `supply -[thickness=5]- backup : =`，我方是 `binding supply → backup`（官方额外的 2 条边是"部件到端口"的聚合边，见已知差异第 2 条） |
 | `verify` | 无 | 官方渲染器不画，按 `RequirementVerificationMembership` 的语义实现，靠样例人工核对 |
 | `derive` | 无 | 官方渲染器不画需求派生，按标准库 `RequirementDerivation` 的语义实现，靠样例人工核对 |
 | `perform` | 无 | 官方把它并入 `perform` 特征、不单独画边，按 `PerformActionUsage` 的语义实现，靠样例人工核对 |

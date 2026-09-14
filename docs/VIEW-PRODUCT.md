@@ -117,9 +117,15 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | 带方向的特征 | `parameters` |
 | `BindingConnector` / `FlowUsage` / `SuccessionFlowUsage` | `bindings` / `flows` / `succession flows` |
 | 文档（`Documentation` 成员） | `documentation` |
-| 其余 | 元类名去 `Usage`/`Definition` 后缀、拆驼峰、复数化，如 `AttributeUsage` → `attributes` |
+| 其余 | 元类名按官方 `SysML2PlantUMLText.getStereotypeName` 的正则 `^((Enum)(?>eration)|(\p{L}+?))(Definition|Usage|AsUsage)$` 取主干，再拆驼峰、复数化 |
 
-**排序**（同样对齐官方）：参数优先且按 `in` → `out` → `inout`；然后按元类名；最后按名字。
+最后这条有三个容易踩的坑（都实测过）：**后缀有三个**（`Definition` / `Usage` / `AsUsage`；
+`SuccessionAsUsage` → `successions`，只去 `Usage` 会得到 `succession ases`）；**裸 `Usage`
+不匹配该正则**（前面至少要有一个字母），要走整名小写，否则拆成空串、复数化成 `s`；
+**`Enumeration*` 取 `Enum`**（`enum` / `enums`，不是 `enumeration`）。
+
+**排序**（同样对齐官方）：参数优先且按 `in` → `inout` → `out`（官方用
+`FeatureDirectionKind` 的声明序 `IN` → `INOUT` → `OUT`）；然后按元类名；最后按名字。
 仓格之间按标题字典序。类型名在仓格里用简单名（与官方 PUML 输出一致），精确引用放条目的 `ref`。
 
 `documentation` 仓格收的是元素自有的 `doc` 文本，正文里的连续空白折叠为单空格；官方渲染把
@@ -194,6 +200,7 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `flow` | 流（`flow of T from a to b;`） | 流的终点 |
 | `perform` | 执行动作（`perform X;`） | 被执行的动作用法 |
 | `succession` | 时序（`first A then B;` / `then B;`） | 后继动作 |
+| `binding` | 绑定（`bind a = b;`） | 另一端（官方画成标 `=` 的粗边） |
 
 出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
 补节点。`typing` / `specialization` / `subsetting` / `redefinition` 只画文本里写出来的，
@@ -206,6 +213,9 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
   视图的节点——它连的是两个需求，只要两端在，边就成立；查找范围是各节点所属的命名空间。
 - `succession` 来自 `Succession`（`first A then B`、`then B`、`succession s first A then B`），
   端点取 `getSource()` / `getTarget()`，与官方行为渲染（`VBehavior.addSuccession`）一致。
+- `binding` 来自 `BindingConnector`（`bind a = b`）。**连接器特征一律要收**：漏掉这一类时，
+  没被直接 expose 的 `bind` 在互联视图里既不出现边、也不出现在节点集，等于静默丢关系
+  （实测样例 `samples/bindings`，官方在同一个视图里画 `a -[thickness=5]- b : =`）。
 
 ### 3.1 按视图类型的投影规则
 
@@ -214,7 +224,7 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | 视图类型 | 投影差异 |
 |---|---|
 | `general` 及一切 `unclassified` | 所有暴露元素都是节点；**被显式暴露**的连接器也是节点，其余连接器仍然画成边 |
-| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是边**（`connection` / `flow` / `allocate` / `succession`）；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
+| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是边**（`connection` / `flow` / `allocate` / `succession` / `binding`）；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
 
 连接器的统一规则是**要么是节点、要么是边**，不会两者都是——否则同一个事实会被画两遍。
 `general` 视图里只有显式暴露的连接器是节点；由递归展开发现的那些（例如动作内部的

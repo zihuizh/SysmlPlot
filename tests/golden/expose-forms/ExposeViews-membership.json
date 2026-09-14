@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:8877963d54049eef5bf534597ddb8120a56a63001fed8d2c454caa232d78c57e",
+  "view": {
+    "ref": "ExposeViews::membership",
+    "name": "membership",
+    "definition": "Structure Derived",
+    "kind": "general",
+    "source": {
+      "document": 1,
+      "line": 13,
+      "offset": 344,
+      "length": 94,
+      "snippet": "view 'membership' : 'Structure Derived' { expose vehicle; expose Engine; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/ExposeModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/ExposeViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "ExposeModel::Engine",
+      "name": "Engine",
+      "metaclass": "PartDefinition",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 8,
+        "offset": 124,
+        "length": 16,
+        "snippet": "part def Engine;"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "ExposeModel::vehicle",
+      "name": "vehicle",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 11,
+        "offset": 166,
+        "length": 92,
+        "snippet": "part vehicle : Vehicle { part engine : Engine; part wheels : Wheel[4]; }"
+      },
+      "types": [
+        "ExposeModel::Vehicle"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "ExposeModel::vehicle::engine",
+      "name": "engine",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 12,
+        "offset": 199,
+        "length": 21,
+        "snippet": "part engine : Engine;"
+      },
+      "parent": "n2",
+      "types": [
+        "ExposeModel::Engine"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "ExposeModel::vehicle::wheels",
+      "name": "wheels",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 13,
+        "offset": 229,
+        "length": 23,
+        "snippet": "part wheels : Wheel[4];"
+      },
+      "parent": "n2",
+      "types": [
+        "ExposeModel::Wheel"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "containment",
+      "source": "n2",
+      "target": "n3",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n2",
+      "target": "n4",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "typing",
+      "source": "n3",
+      "target": "n1",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

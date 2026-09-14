@@ -122,10 +122,18 @@ git config core.hooksPath .githooks
 | 单文件大小 | 默认上限 2 MB，可用 `SYMLPLOT_MAX_FILE_KB` 调整 |
 | 样例校验 | staged 中出现 `samples/**/*.sysml` 时，调用官方解析器验证 |
 | 覆盖率门禁 | staged 中出现 `samples/` 或 `src/` 改动时，跑 `scripts/check-trace.ps1`：应当无缺口的工作区有缺口就阻断提交 |
+| 产物回归 | staged 中出现 `samples/`、`src/` 或 `schema/` 改动时，跑 `scripts/check-products.ps1`：与 `tests/golden` 逐字节比对 + schema 校验 + 抽样确定性（约 2 分钟） |
 
 样例校验依赖 Java 21 与本地对照工具；未找到时跳过并提示，不阻断提交。
 覆盖率门禁依赖 PowerShell；未找到时同样跳过并提示。`samples/requirements` 故意留着缺口
 （门禁的反例），不在默认检查名单里。
+
+产物回归依赖 PowerShell 与 Python 的 `jsonschema`。**产物有意变化时**（改了投影规则、
+改了样例模型、改了 parser 版本），用
+`powershell -ExecutionPolicy Bypass -File scripts\check-products.ps1 -Update`
+重新生成 `tests/golden`，与代码一起提交；期望产物里不含机器相关路径（`documents[].uri`
+的绝对前缀在入库前换成 `file://<WORKSPACE>/…`），换机器、换克隆目录也能逐字节比对。
+默认模式只抽两个样例做确定性比对，`-Full` 才是全量两遍。
 
 `commit-msg` 检查提交信息格式（见 1.2）。
 

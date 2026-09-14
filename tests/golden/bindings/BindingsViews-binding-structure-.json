@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:4491bb96f169296eda6012f453e443d9258a523d634382dccf80f86a79d45c20",
+  "view": {
+    "ref": "BindingsViews::'binding structure'",
+    "name": "binding structure",
+    "definition": "GeneralView",
+    "kind": "general",
+    "source": {
+      "document": 1,
+      "line": 11,
+      "offset": 280,
+      "length": 73,
+      "snippet": "view 'binding structure' : GeneralView { expose controller; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/BindingsModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/BindingsViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "BindingsModel::Controller::backup",
+      "name": "backup",
+      "metaclass": "PortUsage",
+      "graphic": "port",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 6,
+        "offset": 116,
+        "length": 24,
+        "snippet": "port backup : PowerPort;"
+      },
+      "parent": "n3",
+      "types": [
+        "BindingsModel::PowerPort"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "BindingsModel::Controller::supply",
+      "name": "supply",
+      "metaclass": "PortUsage",
+      "graphic": "port",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 5,
+        "offset": 83,
+        "length": 24,
+        "snippet": "port supply : PowerPort;"
+      },
+      "parent": "n3",
+      "types": [
+        "BindingsModel::PowerPort"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "BindingsModel::controller",
+      "name": "controller",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 11,
+        "offset": 273,
+        "length": 66,
+        "snippet": "part controller : Controller { bind supply = backup; }"
+      },
+      "types": [
+        "BindingsModel::Controller"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "binding",
+      "source": "n2",
+      "target": "n1",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

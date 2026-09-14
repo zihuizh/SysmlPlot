@@ -1,0 +1,275 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:1b2a5ee325ce0dbe64e1c31ac825be9fd102152bd9b9640971937dd6e2425a21",
+  "view": {
+    "ref": "ParamViews::'parameters and values'",
+    "name": "parameters and values",
+    "definition": "GeneralView",
+    "kind": "general",
+    "source": {
+      "document": 1,
+      "line": 5,
+      "offset": 107,
+      "length": 142,
+      "snippet": "view 'parameters and values' : GeneralView { expose Focus; expose Shoot; expose Settings; expose camera; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/ParamModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/ParamViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "ParamModel::Focus",
+      "name": "Focus",
+      "metaclass": "ActionDefinition",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 8,
+        "offset": 147,
+        "length": 77,
+        "snippet": "action def Focus { in scene : Scene; out image : Image; }"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "ParamModel::Focus::image",
+      "name": "image",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 10,
+        "offset": 200,
+        "length": 18,
+        "snippet": "out image : Image;"
+      },
+      "parent": "n1",
+      "types": [
+        "ParamModel::Image"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "ParamModel::Focus::scene",
+      "name": "scene",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 9,
+        "offset": 174,
+        "length": 17,
+        "snippet": "in scene : Scene;"
+      },
+      "parent": "n1",
+      "types": [
+        "ParamModel::Scene"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "ParamModel::Settings",
+      "name": "Settings",
+      "metaclass": "AttributeDefinition",
+      "graphic": "attribute",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 29,
+        "offset": 536,
+        "length": 106,
+        "snippet": "attribute def Settings { attribute exposure : Integer = 100; attribute mode : Scene; }"
+      },
+      "types": [],
+      "compartments": [
+        {
+          "title": "attributes",
+          "entries": [
+            {
+              "text": "exposure: Integer",
+              "ref": "ParamModel::Settings::exposure"
+            },
+            {
+              "text": "mode: Scene",
+              "ref": "ParamModel::Settings::mode"
+            }
+          ]
+        },
+        {
+          "title": "values",
+          "entries": [
+            {
+              "text": "exposure = 100",
+              "ref": "ParamModel::Settings::exposure"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n5",
+      "ref": "ParamModel::Shoot",
+      "name": "Shoot",
+      "metaclass": "ActionDefinition",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 13,
+        "offset": 230,
+        "length": 79,
+        "snippet": "action def Shoot { in image : Image; out picture : Image; }"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n6",
+      "ref": "ParamModel::Shoot::image",
+      "name": "image",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 14,
+        "offset": 257,
+        "length": 17,
+        "snippet": "in image : Image;"
+      },
+      "parent": "n5",
+      "types": [
+        "ParamModel::Image"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n7",
+      "ref": "ParamModel::Shoot::picture",
+      "name": "picture",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 15,
+        "offset": 283,
+        "length": 20,
+        "snippet": "out picture : Image;"
+      },
+      "parent": "n5",
+      "types": [
+        "ParamModel::Image"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n8",
+      "ref": "ParamModel::camera",
+      "name": "camera",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 24,
+        "offset": 444,
+        "length": 57,
+        "snippet": "part camera : Camera { perform focusAction; }"
+      },
+      "types": [
+        "ParamModel::Camera"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n9",
+      "ref": "ParamModel::focusAction",
+      "name": "focusAction",
+      "metaclass": "ActionUsage",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 21,
+        "offset": 383,
+        "length": 27,
+        "snippet": "action focusAction : Focus;"
+      },
+      "types": [
+        "ParamModel::Focus"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "containment",
+      "source": "n1",
+      "target": "n2",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n1",
+      "target": "n3",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n6",
+      "authored": true
+    },
+    {
+      "id": "r4",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r5",
+      "kind": "perform",
+      "source": "n8",
+      "target": "n9",
+      "authored": true
+    },
+    {
+      "id": "r6",
+      "kind": "typing",
+      "source": "n9",
+      "target": "n1",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

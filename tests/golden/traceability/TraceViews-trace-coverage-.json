@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:ad79cb7dd71a6b580125d8197ee17ae36bb975efb3fd53e9ca74e761c86635aa",
+  "view": {
+    "ref": "TraceViews::'trace coverage'",
+    "name": "trace coverage",
+    "definition": "GeneralView",
+    "kind": "general",
+    "source": {
+      "document": 1,
+      "line": 5,
+      "offset": 107,
+      "length": 177,
+      "snippet": "view 'trace coverage' : GeneralView { expose vehicleSpeedReq; expose motorSpeedReq; expose vehicle; expose motor; expose speedTest; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/TraceModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/TraceViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "TraceModel::motor",
+      "name": "motor",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 28,
+        "offset": 622,
+        "length": 49,
+        "snippet": "part motor { satisfy motorSpeedReq; }"
+      },
+      "types": [
+        "Parts::Part"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "TraceModel::motorSpeedReq",
+      "name": "motorSpeedReq",
+      "metaclass": "RequirementUsage",
+      "graphic": "requirement",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 15,
+        "offset": 347,
+        "length": 92,
+        "snippet": "requirement <'2.2'> motorSpeedReq : SpeedLimit { attribute :>> maxSpeed = 120; }"
+      },
+      "types": [
+        "TraceModel::SpeedLimit"
+      ],
+      "reqId": "2.2",
+      "compartments": [
+        {
+          "title": "attributes",
+          "entries": [
+            {
+              "text": "maxSpeed: Real",
+              "ref": "TraceModel::motorSpeedReq::maxSpeed"
+            }
+          ]
+        },
+        {
+          "title": "values",
+          "entries": [
+            {
+              "text": "maxSpeed = 120",
+              "ref": "TraceModel::motorSpeedReq::maxSpeed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n3",
+      "ref": "TraceModel::speedTest",
+      "name": "speedTest",
+      "metaclass": "VerificationCaseUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 39,
+        "offset": 817,
+        "length": 35,
+        "snippet": "verification speedTest : SpeedTest;"
+      },
+      "types": [
+        "TraceModel::SpeedTest"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "TraceModel::vehicle",
+      "name": "vehicle",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 24,
+        "offset": 563,
+        "length": 53,
+        "snippet": "part vehicle { satisfy vehicleSpeedReq; }"
+      },
+      "types": [
+        "Parts::Part"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n5",
+      "ref": "TraceModel::vehicleSpeedReq",
+      "name": "vehicleSpeedReq",
+      "metaclass": "RequirementUsage",
+      "graphic": "requirement",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 10,
+        "offset": 204,
+        "length": 94,
+        "snippet": "requirement <'2.1'> vehicleSpeedReq : SpeedLimit { attribute :>> maxSpeed = 180; }"
+      },
+      "types": [
+        "TraceModel::SpeedLimit"
+      ],
+      "reqId": "2.1",
+      "compartments": [
+        {
+          "title": "attributes",
+          "entries": [
+            {
+              "text": "maxSpeed: Real",
+              "ref": "TraceModel::vehicleSpeedReq::maxSpeed"
+            }
+          ]
+        },
+        {
+          "title": "values",
+          "entries": [
+            {
+              "text": "maxSpeed = 180",
+              "ref": "TraceModel::vehicleSpeedReq::maxSpeed"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "derive",
+      "source": "n2",
+      "target": "n5",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "satisfy",
+      "source": "n1",
+      "target": "n2",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "satisfy",
+      "source": "n4",
+      "target": "n5",
+      "authored": true
+    },
+    {
+      "id": "r4",
+      "kind": "verify",
+      "source": "n3",
+      "target": "n2",
+      "authored": true
+    },
+    {
+      "id": "r5",
+      "kind": "verify",
+      "source": "n3",
+      "target": "n5",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

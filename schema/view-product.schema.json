@@ -126,7 +126,7 @@
           "enum": [
             "containment", "typing", "specialization", "subsetting", "redefinition",
             "connection", "satisfy", "verify", "derive", "allocate", "flow", "perform",
-            "succession"
+            "succession", "binding"
           ]
         },
         "source": { "type": "string", "pattern": "^n[0-9]+$" },

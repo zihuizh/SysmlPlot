@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:76405358fac82ca579d5cc0a25b5376cb9298f5c858f2fc01c190213f6f1c035",
+  "view": {
+    "ref": "FlowsViews::'power flows'",
+    "name": "power flows",
+    "definition": "InterconnectionView",
+    "kind": "interconnection",
+    "source": {
+      "document": 1,
+      "line": 5,
+      "offset": 107,
+      "length": 251,
+      "snippet": "view 'power flows' : InterconnectionView { filter @SysML::PartUsage or @SysML::PortUsage or @SysML::ItemUsage; expose powerSystem; expose Tank; expose Engine; …"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/FlowsModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/FlowsViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "FlowsModel::Engine::inlet",
+      "name": "inlet",
+      "metaclass": "PortUsage",
+      "graphic": "port",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 17,
+        "offset": 271,
+        "length": 24,
+        "snippet": "port inlet : FuelInPort;"
+      },
+      "parent": "n7",
+      "types": [
+        "FlowsModel::FuelInPort"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "FlowsModel::FuelInPort::fuelSupply",
+      "name": "fuelSupply",
+      "metaclass": "ItemUsage",
+      "graphic": "item",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 9,
+        "offset": 145,
+        "length": 26,
+        "snippet": "in item fuelSupply : Fuel;"
+      },
+      "parent": "n1",
+      "types": [
+        "FlowsModel::Fuel"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "FlowsModel::FuelOutPort::fuelSupply",
+      "name": "fuelSupply",
+      "metaclass": "ItemUsage",
+      "graphic": "item",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 5,
+        "offset": 76,
+        "length": 27,
+        "snippet": "out item fuelSupply : Fuel;"
+      },
+      "parent": "n4",
+      "types": [
+        "FlowsModel::Fuel"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "FlowsModel::Tank::outlet",
+      "name": "outlet",
+      "metaclass": "PortUsage",
+      "graphic": "port",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 13,
+        "offset": 207,
+        "length": 26,
+        "snippet": "port outlet : FuelOutPort;"
+      },
+      "parent": "n9",
+      "types": [
+        "FlowsModel::FuelOutPort"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n5",
+      "ref": "FlowsModel::powerSystem",
+      "name": "powerSystem",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 23,
+        "offset": 368,
+        "length": 271,
+        "snippet": "part powerSystem { part tank : Tank; part engine : Engine; part logical : LogicalController; part board : PhysicalBoard; flow of Fuel from tank.outlet.fuelSupp…"
+      },
+      "types": [
+        "Parts::Part"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n6",
+      "ref": "FlowsModel::powerSystem::board",
+      "name": "board",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 27,
+        "offset": 493,
+        "length": 27,
+        "snippet": "part board : PhysicalBoard;"
+      },
+      "parent": "n5",
+      "types": [
+        "FlowsModel::PhysicalBoard"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n7",
+      "ref": "FlowsModel::powerSystem::engine",
+      "name": "engine",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 25,
+        "offset": 421,
+        "length": 21,
+        "snippet": "part engine : Engine;"
+      },
+      "parent": "n5",
+      "types": [
+        "FlowsModel::Engine"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n8",
+      "ref": "FlowsModel::powerSystem::logical",
+      "name": "logical",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 26,
+        "offset": 451,
+        "length": 33,
+        "snippet": "part logical : LogicalController;"
+      },
+      "parent": "n5",
+      "types": [
+        "FlowsModel::LogicalController"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n9",
+      "ref": "FlowsModel::powerSystem::tank",
+      "name": "tank",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 24,
+        "offset": 395,
+        "length": 17,
+        "snippet": "part tank : Tank;"
+      },
+      "parent": "n5",
+      "types": [
+        "FlowsModel::Tank"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "allocate",
+      "source": "n8",
+      "target": "n6",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n6",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r4",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n8",
+      "authored": true
+    },
+    {
+      "id": "r5",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n9",
+      "authored": true
+    },
+    {
+      "id": "r6",
+      "kind": "flow",
+      "source": "n4",
+      "target": "n1",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}
