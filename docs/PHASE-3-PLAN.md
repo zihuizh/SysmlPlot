@@ -342,6 +342,11 @@ T0 里原先靠手工的两件事（确定性比对、schema 校验）和一件�
 | 仓格标题算错：裸 `Usage` → `s`、`SuccessionAsUsage` → `succession ases` | 按官方 `Sysml2PlantUMLText.getStereotypeName` 的正则重写（含 `AsUsage`、裸 `Usage`、`Enumeration`、`" def"` 分支）；受影响样例行已复核为 `usages` / `successions` |
 | `bind` 在互联视图里不成边（官方画 `a -[thickness=5]- b : =`） | `BindingConnector` 收进连接器集合，新增 `relationship.kind = binding`；新增样例 `samples/bindings` 作对照 |
 
+**全量语料复核（2026-09-14，248 个工作区 / 304 份产物）**：坏标题 **0 个**——
+`usages` 3 处、`successions` 2 处，正是修复后的正确标题（修复前是 `s` / `succession ases`）；
+全语料新增 `binding` 边 **8 条**；`211 / 248` 零错误出产物的结论、以及 37 个跨目录 import
+断链工作区与官方诊断 `37 / 37` 一致，均与修复前相同（输入未变、诊断代码未动）。
+
 ## 5.3 性能校验
 
 **要测的指标**（分阶段计时，避免只有总数看不出瓶颈）：
