@@ -22,7 +22,7 @@ import io.github.zihuizh.sysmlplot.engine.SysMLWorkspace;
  * 对整个工作区做一次批量检查，用于**官方语料验收**：给一个语料目录，报告每个文件的
  * 错误/警告数量，并输出可入库的报告 JSON。
  *
- * <p>它同时是性能观察点：报告里带各阶段耗时，见 {@code docs/PHASE-3-PLAN.md} 的验收与性能章节。
+ * <p>它同时是性能观察点：报告里带各阶段耗时，见 {@code docs/archive/PHASE-3-PLAN.md} 的验收与性能章节。
  */
 public final class WorkspaceCheck {
 

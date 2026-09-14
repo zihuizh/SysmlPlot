@@ -1,5 +1,7 @@
 # 阶段 1 技术方案
 
+> 已归档：阶段 1 已完成。本文件保留原始方案，当前方向以 `docs/ROADMAP.md` 为准。
+
 ## 1. 目标
 
 用 OMG 官方解析器解析 SysML v2 文本，按 `view` / `expose` 机制生成视图。
@@ -102,6 +104,6 @@ General View。
 3. 确认 Pilot API 的入口与所需最小依赖集合
 4. 把这套启动方式固化成 `scripts/` 下的构建与运行脚本
 
-**状态：已完成（2026-09-10）**，结论与实测数据见 `docs/PHASE-1-FINDINGS.md`。
+**状态：已完成（2026-09-10）**，结论与实测数据见 `docs/archive/PHASE-1-FINDINGS.md`。
 主要修正：视图求值不需要我们自己实现——官方 `ViewUsage.getExposedElement()` 已经同时
 应用了 expose 与 filter；工作区必须用 `readAll` 加载而不是 `next()/parse()`。

@@ -15,7 +15,7 @@ import java.util.Map;
  *
  * <p>输出刻意做成**稀疏列表**而不是网格：真实模型里需求成百上千，网格大部分是空格子，
  * 既看不清也没法读。稀疏列表只写有内容的格子，并按所属包分块——这与
- * `docs/PHASE-3-PLAN.md` 里 S3-7 的做法一致。
+ * `docs/archive/PHASE-3-PLAN.md` 里 S3-7 的做法一致。
  */
 public final class TraceMatrix {
 
