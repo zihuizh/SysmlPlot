@@ -88,7 +88,7 @@
 
 ### 3.2 查询层
 
-四个消费者共用一个遍历函数，避免各做一套：
+三个**遍历型**消费者共用一个遍历函数，避免各做一套：
 
 ```text
 traverse(ref, direction = out | in | both, kinds = [...], depth = N)
@@ -99,7 +99,11 @@ traverse(ref, direction = out | in | both, kinds = [...], depth = N)
 | 关系列表（1 跳） | `traverse(ref, both, 全类型, 1)` |
 | 局部关系视图 | `traverse(ref, both, 全类型, N)` → 生成**子产物** |
 | 影响范围分析 | `traverse(ref, in, 影响型边, N)`，再按 `authored`/`origin` 过滤 |
-| 追溯矩阵 | `traverse(reqRef, in, [satisfy, verify, derive], 1)` |
+| 追溯矩阵 | 不是遍历而是**聚合**：先按端点给关系建索引，再一次性算出每行（见 3.3） |
+
+（实现落点：关系列表 / 局部关系视图 / 影响范围在 `view/ModelQuery`，矩阵在
+`view/TraceMatrix`。矩阵本来也能用 `traverse` 拼，但那是 O(需求 × 关系)——
+实测在语料规模上会明显变慢，改成线性取数。）
 
 ### 3.3 追溯矩阵与覆盖率门禁
 
