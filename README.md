@@ -14,6 +14,7 @@ SysML v2 视图生成与查看工具。以 SysML v2 文本为事实源，按标�
 | `docs/VIEW-PRODUCT.md` | **视图产物契约**：字段、词表、暴露范围、排序与渲染器契约 |
 | `docs/GRAPH-LIB-P0.md` | 图库框架 P0：G6 与 Cytoscape 原型和实测结果 |
 | `docs/GRAPH-LIB-P1.md` | 图库框架 P1：原生布局、交互与动画的实测与选型结论 |
+| `docs/RELATION-DEMO.md` | 关系与追溯 Demo：元素关系、局部关系图、追溯关系、影响范围、追溯矩阵 |
 | `docs/ORACLE-DIFF.md` | 与官方渲染、SysON 的差分验证结论（含已知差异的原因） |
 | `docs/PERF-BASELINE.md` | 性能基线：分档耗时与瓶颈定位 |
 | `docs/BACKLOG.md` | 已知但尚未做的事情 |
