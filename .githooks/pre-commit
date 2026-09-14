@@ -25,7 +25,7 @@ fi
 
 # --- 1. 禁止的路径与文件类型 ------------------------------------------------
 blocked_dir='^(build|out|target|dist|node_modules|\.gradle|\.idea)/'
-blocked_ext='\.(jar|class|exe|dll|so|dylib|war|ear|zip|7z|tar|tgz|gz|bin|pdb)$'
+blocked_ext='\.(jar|class|pyc|exe|dll|so|dylib|war|ear|zip|7z|tar|tgz|gz|bin|pdb)$'
 path_bad=0
 while IFS= read -r f; do
     if [ "$f" = 'local.env.ps1' ]; then
@@ -101,6 +101,29 @@ if grep -Eq '^samples/.*\.(sysml|kerml)$' "$list"; then
     fi
 fi
 
+# --- 4. 需求覆盖率门禁 ------------------------------------------------------
+# 只对"应当没有缺口"的工作区跑（清单在 scripts/check-trace.ps1 里），十几秒量级。
+if grep -Eq '^(samples|src)/' "$list"; then
+    shell_bin=''
+    if command -v pwsh >/dev/null 2>&1; then
+        shell_bin=pwsh
+    elif command -v powershell >/dev/null 2>&1; then
+        shell_bin=powershell
+    fi
+    if [ -z "$shell_bin" ]; then
+        say '跳过覆盖率门禁：未找到 PowerShell'
+    else
+        trace_log=${TMPDIR:-/tmp}/sysmlplot-trace.log
+        say '需求覆盖率门禁 ...'
+        if "$shell_bin" -NoProfile -ExecutionPolicy Bypass -File scripts/check-trace.ps1 >"$trace_log" 2>&1; then
+            ok '覆盖率门禁通过'
+        else
+            bad '覆盖率门禁未通过'
+            sed 's/^/      /' "$trace_log" | tail -n 20
+        fi
+    fi
+fi
+
 if [ "$fail" -ne 0 ]; then
     printf '\n提交被阻止。规则见 docs/DEVELOPMENT.md，紧急情况可 git commit --no-verify。\n'
     exit 1
@@ -108,4 +131,3 @@ fi
 
 printf '==> 检查通过\n'
 exit 0
-

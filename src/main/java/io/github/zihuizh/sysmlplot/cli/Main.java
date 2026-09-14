@@ -20,6 +20,11 @@ import io.github.zihuizh.sysmlplot.render.SvgRenderer;
 import io.github.zihuizh.sysmlplot.view.ViewProduct;
 import io.github.zihuizh.sysmlplot.view.ViewProductBuilder;
 import io.github.zihuizh.sysmlplot.view.SourceLookup;
+import io.github.zihuizh.sysmlplot.view.ModelQuery;
+import io.github.zihuizh.sysmlplot.view.LocalViewBuilder;
+import io.github.zihuizh.sysmlplot.view.TraceMatrix;
+import io.github.zihuizh.sysmlplot.view.WorkspaceIndex;
+import io.github.zihuizh.sysmlplot.view.WorkspaceIndexBuilder;
 
 /**
  * 命令行入口。
@@ -34,9 +39,18 @@ import io.github.zihuizh.sysmlplot.view.SourceLookup;
  *        [--emit-layout &lt;file&gt;] 输出本次使用的布局
  *        [--at &lt;path:line[:col]&gt;] 反查：源码位置落在哪些节点范围内（最内层在前）
  *        [--serve &lt;port&gt;]      启动本地预览服务（交互式页面 + /cursor 光标通道）
+ *        [--index &lt;file&gt;]      输出全模型索引（跨视图的关系底座，不需要 --view）
+ *        [--check]             批量检查整个工作区（官方语料验收入口）
+ *        [--report &lt;file&gt;]     与 --check 搭配，输出逐文件报告 JSON
+ *        [--all-views &lt;dir&gt;]   一次加载把工作区里**所有视图**各导出一份产物
+ *        [--query &lt;kind&gt; --ref &lt;ref&gt; [--depth N]]  查询：neighbors / impact / views / subgraph
+ *        [--local-view &lt;ref&gt;]   以某元素为中心生成**局部关系视图**（产物变换，可配 -Svg/-Html）
+ *        [--matrix]            需求追溯矩阵（稀疏列表 + 按包分块；配 -Out 输出 JSON）
+ *        [--gaps-only]         只保留既无满足方、也无验证方的需求
+ *        [--gate]              覆盖率门禁：有缺口即以退出码 4 结束
  * </pre>
  *
- * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误。
+ * <p>退出码：0 成功；2 指定的视图不存在；3 参数错误；4 覆盖率门禁未通过。
  */
 public final class Main {
 
@@ -49,6 +63,13 @@ public final class Main {
     }
 
     public static void main(String[] args) throws Exception {
+        // 控制台输出固定用 UTF-8：Windows 的默认代码页会把中文写成 GBK，
+        // 重定向到文件后按 UTF-8 读就是乱码，而产物、文档、脚本都约定 UTF-8。
+        System.setOut(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.out),
+                true, StandardCharsets.UTF_8));
+        System.setErr(new java.io.PrintStream(new java.io.FileOutputStream(java.io.FileDescriptor.err),
+                true, StandardCharsets.UTF_8));
+
         Path libraryDir = null;
         Path workspaceDir = null;
         Path out = null;
@@ -59,6 +80,17 @@ public final class Main {
         String viewRef = null;
         String at = null;
         Integer servePort = null;
+        Path indexOut = null;
+        boolean check = false;
+        Path reportOut = null;
+        Path allViewsOut = null;
+        String query = null;
+        String queryRef = null;
+        int queryDepth = 1;
+        String localViewRef = null;
+        boolean matrix = false;
+        boolean gapsOnly = false;
+        boolean gate = false;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -72,6 +104,17 @@ public final class Main {
                 case "--emit-layout" -> layoutOut = Path.of(args[++i]);
                 case "--at" -> at = args[++i];
                 case "--serve" -> servePort = Integer.parseInt(args[++i]);
+                case "--index" -> indexOut = Path.of(args[++i]);
+                case "--check" -> check = true;
+                case "--report" -> reportOut = Path.of(args[++i]);
+                case "--all-views" -> allViewsOut = Path.of(args[++i]);
+                case "--query" -> query = args[++i];
+                case "--ref" -> queryRef = args[++i];
+                case "--depth" -> queryDepth = Integer.parseInt(args[++i]);
+                case "--local-view" -> localViewRef = args[++i];
+                case "--matrix" -> matrix = true;
+                case "--gaps-only" -> gapsOnly = true;
+                case "--gate" -> gate = true;
                 default -> {
                     System.err.println("unknown argument: " + args[i]);
                     System.exit(3);
@@ -84,10 +127,81 @@ public final class Main {
             System.exit(3);
         }
 
+        long loadStarted = System.currentTimeMillis();
         SysMLWorkspace workspace = SysMLWorkspace.load(libraryDir, workspaceDir);
+        long loadMillis = System.currentTimeMillis() - loadStarted;
         System.out.println("[workspace] " + workspace.workspaceRoot());
         System.out.println("[modelDigest] " + workspace.modelDigest());
+
+        if (check) {
+            WorkspaceCheck.run(workspace, reportOut, loadMillis);
+            return;
+        }
+
+        if (allViewsOut != null) {
+            writeAllViews(workspace, allViewsOut);
+            return;
+        }
+
+        if (query != null) {
+            if (queryRef == null) {
+                System.err.println("--query 需要搭配 --ref");
+                System.exit(3);
+            }
+            printQuery(WorkspaceIndexBuilder.build(workspace), query, queryRef, queryDepth);
+            return;
+        }
+
+        // 追溯矩阵：全模型口径，不看单个视图的 expose 边界
+        if (matrix) {
+            TraceMatrix.Matrix full = TraceMatrix.build(WorkspaceIndexBuilder.build(workspace));
+            TraceMatrix.Matrix shown = gapsOnly ? TraceMatrix.gapsOnly(full) : full;
+            System.out.print(TraceMatrix.toText(shown));
+            if (out != null) {
+                write(out, GSON.toJson(shown) + "\n");
+                System.out.println("[matrix] written to " + out.toAbsolutePath());
+            }
+            if (gate) {
+                if (full.gaps() > 0) {
+                    System.err.printf("[gate] %d 条需求既没有满足方、也没有验证方%n", full.gaps());
+                    System.exit(4);
+                }
+                System.out.println("[gate] 需求覆盖检查通过：没有缺口");
+            }
+            return;
+        }
+
+        // 局部关系视图：整模型取数，不受当前视图 expose 边界的限制
+        if (localViewRef != null) {
+            ViewProduct.Product local = LocalViewBuilder.build(
+                    WorkspaceIndexBuilder.build(workspace), localViewRef, queryDepth);
+            if (out == null) {
+                System.out.println(GSON.toJson(local));
+            } else {
+                write(out, GSON.toJson(local) + "\n");
+                System.out.println("[local-view] written to " + out.toAbsolutePath());
+            }
+            if (svg != null) {
+                write(svg, SvgRenderer.render(local, null).svg());
+                System.out.println("[svg] written to " + svg.toAbsolutePath());
+            }
+            if (html != null) {
+                write(html, HtmlRenderer.render(local));
+                System.out.println("[html] written to " + html.toAbsolutePath());
+            }
+            return;
+        }
+
         printDiagnostics(workspace);
+
+        if (indexOut != null) {
+            WorkspaceIndex.Index index = WorkspaceIndexBuilder.build(workspace);
+            write(indexOut, GSON.toJson(index) + "\n");
+            System.out.println("[index] written to " + indexOut.toAbsolutePath());
+            System.out.printf("[index] elements=%d relations=%d%n",
+                    index.elements().size(), index.relations().size());
+            return;
+        }
 
         List<ViewUsage> views = workspace.views();
         if (viewRef == null) {
@@ -107,7 +221,7 @@ public final class Main {
 
         if (servePort != null) {
             String pageHtml = HtmlRenderer.render(product);
-            PreviewServer.start(servePort, pageHtml, product, workspace.workspaceRoot());
+            PreviewServer.start(servePort, workspace, WorkspaceIndexBuilder.build(workspace), product, pageHtml);
             // 服务跑在后台线程上，主线程阻塞住，Ctrl+C 结束
             while (true) {
                 Thread.sleep(60_000L);
@@ -163,6 +277,65 @@ public final class Main {
      * <p>这是"源码 → 图形"这半边联动的引擎侧实现；编辑器扩展只需把光标位置传进来即可。
      * 位置格式：{@code <path>:<line>[:<col>]}，路径可绝对或相对工作区，列从 1 开始、缺省为 1。
      */
+    /** 输出时只显示文件名，避免整条 URI 把表格撑爆。 */
+    private static String shortUri(String uri) {
+        int slash = uri.lastIndexOf('/');
+        return slash < 0 ? uri : uri.substring(slash + 1);
+    }
+
+    /** 查询入口：把索引上的遍历能力暴露给命令行，便于验证与脚本化。 */
+    private static void printQuery(WorkspaceIndex.Index index, String query, String ref, int depth) {
+        switch (query) {
+            case "neighbors" -> {
+                System.out.printf("[query] neighbors of %s%n", ref);
+                for (ModelQuery.Neighbor neighbor : ModelQuery.neighbors(index, ref)) {
+                    System.out.printf("  %-14s %s %-34s <%s>%s%n",
+                            neighbor.kind(),
+                            neighbor.outgoing() ? "\u2192" : "\u2190",
+                            neighbor.ref(),
+                            neighbor.metaclass() == null ? "?" : neighbor.metaclass(),
+                            neighbor.authored() ? "" : "  (推导)");
+                }
+            }
+            case "impact" -> {
+                System.out.printf("[query] impact of %s (反向可达, depth<=%d)%n", ref, depth);
+                List<ModelQuery.Impact> impacts = ModelQuery.impact(index, ref, depth);
+                for (ModelQuery.Impact impact : impacts) {
+                    WorkspaceIndex.ElementEntry element = ModelQuery.elementOf(index, impact.ref());
+                    String where = element == null || element.source() == null
+                            ? ""
+                            : String.format("  @%s:%d", shortUri(element.source().uri()), element.source().line());
+                    System.out.printf("  depth=%d  via %-14s %-40s <%s>%s%n",
+                            impact.depth(), impact.viaKind(), impact.ref(),
+                            impact.metaclass() == null ? "?" : impact.metaclass(),
+                            where);
+                }
+                System.out.printf("  合计 %d 个受影响元素%n", impacts.size());
+            }
+            case "views" -> {
+                System.out.printf("[query] views containing %s%n", ref);
+                for (String view : ModelQuery.viewsOf(index, ref)) {
+                    System.out.printf("  %s%n", view);
+                }
+            }
+            case "subgraph" -> {
+                ModelQuery.Subgraph subgraph = ModelQuery.subgraph(index, ref, depth);
+                System.out.printf("[query] subgraph around %s (depth<=%d): nodes=%d edges=%d%n",
+                        ref, depth, subgraph.nodes().size(), subgraph.edges().size());
+                for (String node : subgraph.nodes()) {
+                    System.out.printf("  node %s%n", node);
+                }
+                for (WorkspaceIndex.RelationEntry edge : subgraph.edges()) {
+                    System.out.printf("  edge %-14s %s -> %s%n", edge.kind(), edge.source(), edge.target());
+                }
+            }
+            default -> {
+                System.err.println("未知查询: " + query + "（可用 neighbors / impact / views / subgraph）");
+                System.exit(3);
+            }
+        }
+    }
+
     private static void printNodesAt(ViewProduct.Product product, Path workspaceRoot, String at) throws Exception {
         List<ViewProduct.NodeRef> matches = SourceLookup.nodesAt(product, workspaceRoot, at);
         System.out.printf("[at] %s%n", at);
@@ -186,6 +359,31 @@ public final class Main {
             Files.createDirectories(target.getParent());
         }
         Files.writeString(target, content, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 一次加载导出全部视图的产物。
+     *
+     * <p>存在的理由：官方语料里的模型经常互相引用（示例是"片段"，要整批一起才解析得通），
+     * 所以验收时不能一个模型一个工作区，而是"一个语料工作区 + 遍历它所有的视图"。
+     */
+    private static void writeAllViews(SysMLWorkspace workspace, Path outDir) throws Exception {
+        Path target = outDir.toAbsolutePath();
+        Files.createDirectories(target);
+        int written = 0;
+        for (ViewUsage view : workspace.views()) {
+            String ref = view.getQualifiedName();
+            if (ref == null) {
+                continue;
+            }
+            ViewProduct.Product product = ViewProductBuilder.build(workspace, view);
+            String slug = ref.replaceAll("[^A-Za-z0-9._-]+", "-");
+            write(target.resolve(slug + ".json"), GSON.toJson(product) + "\n");
+            System.out.printf("  %-62s nodes=%d edges=%d%n",
+                    ref, product.nodes().size(), product.relationships().size());
+            written++;
+        }
+        System.out.printf("[all-views] %d view(s) written to %s%n", written, target);
     }
 
     private static void printDiagnostics(SysMLWorkspace workspace) {

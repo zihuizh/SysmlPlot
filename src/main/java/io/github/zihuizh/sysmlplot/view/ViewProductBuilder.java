@@ -17,6 +17,7 @@ import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.omg.sysml.lang.sysml.Connector;
 import org.omg.sysml.lang.sysml.ConnectionUsage;
+import org.omg.sysml.lang.sysml.ConstraintUsage;
 import org.omg.sysml.lang.sysml.Element;
 import org.omg.sysml.lang.sysml.Feature;
 import org.omg.sysml.lang.sysml.FeatureDirectionKind;
@@ -29,11 +30,19 @@ import org.omg.sysml.lang.sysml.ItemUsage;
 import org.omg.sysml.lang.sysml.ActorMembership;
 import org.omg.sysml.lang.sysml.ActionUsage;
 import org.omg.sysml.lang.sysml.AllocationUsage;
+import org.omg.sysml.lang.sysml.Annotation;
 import org.omg.sysml.lang.sysml.ObjectiveMembership;
 import org.omg.sysml.lang.sysml.OccurrenceUsage;
 import org.omg.sysml.lang.sysml.OwningMembership;
 import org.omg.sysml.lang.sysml.PartUsage;
 import org.omg.sysml.lang.sysml.PortUsage;
+import org.omg.sysml.lang.sysml.PerformActionUsage;
+import org.omg.sysml.lang.sysml.Documentation;
+import org.omg.sysml.lang.sysml.MetadataFeature;
+import org.omg.sysml.lang.sysml.RequirementVerificationMembership;
+import org.omg.sysml.lang.sysml.RequirementUsage;
+import org.omg.sysml.lang.sysml.VerificationCaseDefinition;
+import org.omg.sysml.lang.sysml.VerificationCaseUsage;
 import org.omg.sysml.lang.sysml.Redefinition;
 import org.omg.sysml.lang.sysml.Relationship;
 import org.omg.sysml.lang.sysml.ReferenceSubsetting;
@@ -44,6 +53,7 @@ import org.omg.sysml.lang.sysml.StateUsage;
 import org.omg.sysml.lang.sysml.SatisfyRequirementUsage;
 import org.omg.sysml.lang.sysml.SubjectMembership;
 import org.omg.sysml.lang.sysml.Subsetting;
+import org.omg.sysml.lang.sysml.Succession;
 import org.omg.sysml.lang.sysml.SuccessionFlowUsage;
 import org.omg.sysml.lang.sysml.Type;
 import org.omg.sysml.lang.sysml.ViewDefinition;
@@ -59,8 +69,14 @@ import io.github.zihuizh.sysmlplot.engine.SysMLWorkspace;
  */
 public final class ViewProductBuilder {
 
-    /** 标准视图定义（限定名）到产物 `view.kind` 的映射；顺序是从具体到一般。 */
-    private static final Map<String, String> STANDARD_VIEW_KINDS = Map.ofEntries(
+    /**
+     * 标准视图定义（限定名）到产物 `view.kind` 的映射；**顺序从具体到一般，命中即返回**。
+     *
+     * <p>必须是 `List` 而不是 `Map`：`Map.ofEntries` 的迭代顺序由哈希决定，同一个视图
+     * （例如 `ActionFlowView`，它特化 `InterconnectionView`）可能被判成 `actionFlow`，
+     * 也可能被判成 `interconnection`——产物就不确定了。实测踩到过。
+     */
+    private static final List<Map.Entry<String, String>> STANDARD_VIEW_KINDS = List.of(
             Map.entry("StandardViewDefinitions::ActionFlowView", "actionFlow"),
             Map.entry("StandardViewDefinitions::StateTransitionView", "stateTransition"),
             Map.entry("StandardViewDefinitions::SequenceView", "sequence"),
@@ -78,6 +94,11 @@ public final class ViewProductBuilder {
 
     /** 暴露范围的节点上限，超过就截断并记录原因，避免递归展开失控。 */
     private static final int MAX_SCOPE_NODES = 200;
+
+    /** 需求派生的三个元数据（标准库 `RequirementDerivation` 领域库里的定义名）。 */
+    private static final String DERIVATION_METADATA = "DerivationMetadata";
+    private static final String DERIVED_METADATA = "DerivedRequirementMetadata";
+    private static final String ORIGINAL_METADATA = "OriginalRequirementMetadata";
 
     private ViewProductBuilder() {
     }
@@ -196,6 +217,16 @@ public final class ViewProductBuilder {
                     }
                     continue;
                 }
+                // `perform X;` 本身不进节点集（它是边），但**被执行的动作用法要拉进范围**：
+                // 否则边的一端落不到节点上，整条 perform 边会消失。
+                if (feature instanceof PerformActionUsage perform) {
+                    Element performed = perform.getPerformedAction();
+                    if (performed instanceof Feature performedFeature && seen.add(performedFeature)) {
+                        scope.add(performedFeature);
+                        queue.add(performedFeature);
+                    }
+                    continue;
+                }
                 if (!isStructuralFeature(feature) || !seen.add(feature)) {
                     continue;
                 }
@@ -249,13 +280,17 @@ public final class ViewProductBuilder {
 
     /** 会变成边的连接类特征。 */
     private static boolean isConnectorFeature(Feature feature) {
-        return feature instanceof ConnectionUsage || feature instanceof FlowUsage;
+        // succession（`first A then B`）也是连接器：它跟流一样是"两个元素之间的关系"，
+        // 在互联类视图里应当画成边，而不是又一个框。
+        return feature instanceof ConnectionUsage || feature instanceof FlowUsage
+                || feature instanceof Succession;
     }
 
     /** 结构特征 = 会画成框的东西；连接器除外（由投影决定它是边还是仓格条目）。 */
     private static boolean isStructuralFeature(Feature feature) {
         if (feature instanceof ConnectionUsage || feature instanceof BindingConnector
-                || feature instanceof SatisfyRequirementUsage) {
+                || feature instanceof SatisfyRequirementUsage || feature instanceof PerformActionUsage
+                || feature instanceof ConstraintUsage) {
             return false;
         }
         if (feature.getDirection() != null) {
@@ -277,7 +312,7 @@ public final class ViewProductBuilder {
         }
         Set<String> qualifiedNames = new HashSet<>();
         collectSupertypes(definition, qualifiedNames);
-        for (Map.Entry<String, String> entry : STANDARD_VIEW_KINDS.entrySet()) {
+        for (Map.Entry<String, String> entry : STANDARD_VIEW_KINDS) {
             if (qualifiedNames.contains(entry.getKey())) {
                 return entry.getValue();
             }
@@ -460,6 +495,7 @@ public final class ViewProductBuilder {
                 source,
                 parent,
                 typeNamesOf(element),
+                element instanceof RequirementUsage requirement ? blankToNull(requirement.getReqId()) : null,
                 compartmentsOf(element, nodeIds, connectors));
     }
 
@@ -480,6 +516,7 @@ public final class ViewProductBuilder {
         features.removeIf(connectors::contains);
         features.removeIf(Feature::isEnd);
         features.removeIf(SatisfyRequirementUsage.class::isInstance);
+        features.removeIf(PerformActionUsage.class::isInstance);
         features.sort(Comparator
                 .comparing((Feature feature) -> feature.getDirection() == null ? 1 : 0)
                 .thenComparing(feature -> feature.getDirection() == null
@@ -512,7 +549,23 @@ public final class ViewProductBuilder {
             compartments.add(new ViewProduct.CompartmentRef(group.getKey(), List.copyOf(group.getValue())));
         }
         compartments.sort(Comparator.comparing(ViewProduct.CompartmentRef::title));
+
+        // 文档（doc）单独成一个仓格：官方渲染也把它放在节点下方独立区域
+        List<ViewProduct.EntryRef> docs = new ArrayList<>();
+        for (Documentation documentation : element.getDocumentation()) {
+            String body = blankToNull(collapse(documentation.getBody()));
+            if (body != null) {
+                docs.add(new ViewProduct.EntryRef(body, null, null, null));
+            }
+        }
+        if (!docs.isEmpty()) {
+            compartments.add(new ViewProduct.CompartmentRef("documentation", List.copyOf(docs)));
+        }
         return List.copyOf(compartments);
+    }
+
+    private static String collapse(String text) {
+        return text == null ? null : text.replaceAll("\\s+", " ").trim();
     }
 
     /** 找出需要把值列进仓格的特征：自己不是节点、也不是已变成边的连接器。 */
@@ -702,31 +755,38 @@ public final class ViewProductBuilder {
             }
         }
 
-        // 连接器在互联类视图里是边：端点由 reference subsetting / 特征链解析到真实特征。
-        if (interconnectionLike) {
-            for (Element element : connectors) {
-                if (!(element instanceof Connector connector)) {
-                    continue;
-                }
-                List<Feature> ends = connector.getConnectorEnd();
-                if (ends.size() != 2) {
-                    continue;
-                }
-                String sourceId = nodeIdFor(resolveConnectorEnd(ends.get(0), 0), nodeIds);
-                String targetId = nodeIdFor(resolveConnectorEnd(ends.get(1), 0), nodeIds);
-                if (sourceId != null && targetId != null) {
-                    addEdge(edges, new Edge(connectorKind(element), sourceId, targetId, true));
-                }
+        // 连接器要么是节点、要么是边，不会两者都是——否则同一个事实会被画两遍。
+        // 互联类视图里连接器从不成节点（一律是边）；general 视图里只有被显式暴露的连接器才是节点，
+        // 由递归展开发现的那些仍然画成边。
+        for (Element element : connectors) {
+            if (!(element instanceof Connector connector)) {
+                continue;
+            }
+            if (!interconnectionLike && nodeIds.containsKey(element)) {
+                continue;
+            }
+            // 端点由 reference subsetting / 特征链解析到真实特征
+            List<Feature> ends = connector.getConnectorEnd();
+            if (ends.size() != 2) {
+                continue;
+            }
+            String sourceId = nodeIdFor(resolveConnectorEnd(ends.get(0), 0), nodeIds);
+            String targetId = nodeIdFor(resolveConnectorEnd(ends.get(1), 0), nodeIds);
+            if (sourceId != null && targetId != null) {
+                addEdge(edges, new Edge(connectorKind(element), sourceId, targetId, true));
             }
         }
 
         collectSatisfyEdges(nodeIds, edges);
+        collectVerifyEdges(nodeIds, edges);
+        collectPerformEdges(nodeIds, edges);
+        collectDeriveEdges(nodeIds, edges);
 
         List<Edge> sorted = new ArrayList<>(edges.values());
         sorted.sort(Comparator
                 .comparing(Edge::kind)
-                .thenComparing(edge -> nodeNumber(edge.source()))
-                .thenComparing(edge -> nodeNumber(edge.target())));
+                .thenComparing(edge -> edge.source(), endComparator())
+                .thenComparing(edge -> edge.target(), endComparator()));
 
         List<ViewProduct.RelationshipRef> relationships = new ArrayList<>(sorted.size());
         for (int i = 0; i < sorted.size(); i++) {
@@ -746,6 +806,10 @@ public final class ViewProductBuilder {
         }
         if (element instanceof FlowUsage) {
             return "flow";
+        }
+        // 时序（`first A then B` / `then B`）：官方在行为视图里画成带 `then` 的箭头
+        if (element instanceof Succession) {
+            return "succession";
         }
         return "connection";
     }
@@ -774,6 +838,201 @@ public final class ViewProductBuilder {
                 }
             }
         }
+    }
+
+    /**
+     * `verify` 边：验证用例 → 被验证的需求。
+     *
+     * <p>模型里写的是 `objective { verify req; }`，语义上由
+     * `RequirementVerificationMembership` 承载。优先用派生查询
+     * `VerificationCaseUsage.getVerifiedRequirement()`（它会把嵌套的目标成员关系一并算出来），
+     * 再用成员关系扫描兜底——两种写法都能覆盖。
+     */
+    private static void collectVerifyEdges(Map<Element, String> nodeIds, Map<String, Edge> edges) {
+        for (Map.Entry<Element, String> entry : nodeIds.entrySet()) {
+            Element element = entry.getKey();
+            if (element instanceof VerificationCaseUsage verification) {
+                for (RequirementUsage verified : verification.getVerifiedRequirement()) {
+                    addEdgeIfResolved(edges, nodeIds, "verify", element, verified, element);
+                }
+            }
+            for (Relationship relationship : element.getOwnedRelationship()) {
+                if (relationship instanceof RequirementVerificationMembership membership) {
+                    // 边要从**验证用例**出发，而不是从 `objective { … }` 生成的包装用法出发：
+                    // 包装用法是编译器产物（Pilot 给它起名叫 `obj`，官方渲染器同样特殊处理它）。
+                    addEdgeIfResolved(edges, nodeIds, "verify", enclosingCase(element),
+                            membership.getVerifiedRequirement(), membership);
+                }
+            }
+        }
+    }
+
+    /** 向上找承载这条验证的验证用例（定义或用法）；找到才是真正的验证方。 */
+    private static Element enclosingCase(Element element) {
+        for (Element current = element; current != null; current = current.getOwner()) {
+            if (current instanceof VerificationCaseUsage || current instanceof VerificationCaseDefinition) {
+                return current;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * `perform` 边：执行方（部件/动作）→ 被执行的动作用法。
+     *
+     * <p>`perform X;` 语句本身不进节点集（否则同一个事实会同时是节点和边），
+     * 与 `satisfy` / 连接器的处理方式一致。
+     */
+    private static void collectPerformEdges(Map<Element, String> nodeIds, Map<String, Edge> edges) {
+        for (Map.Entry<Element, String> entry : nodeIds.entrySet()) {
+            // 与 satisfy 一样：perform 语句是**节点的自有特征**，不是节点本身
+            if (!(entry.getKey() instanceof Type type)) {
+                continue;
+            }
+            for (Feature feature : type.getOwnedFeature()) {
+                if (!(feature instanceof PerformActionUsage perform)) {
+                    continue;
+                }
+                // 被执行的动作用法可能不在节点集里；退回 reference subsetting / 特征链解析
+                Element performed = perform.getPerformedAction();
+                if (performed == null || nodeIdFor(performed, nodeIds) == null) {
+                    performed = resolveConnectorEnd(perform, 0);
+                }
+                addEdgeIfResolved(edges, nodeIds, "perform", perform.getOwner(), performed, perform);
+            }
+        }
+    }
+
+    /**
+     * `derive` 边：派生需求 → 原需求（依赖方 → 被依赖方，与 `typing` 等一致）。
+     *
+     * <p>需求派生在 SysML v2 里不是关键字，而是标准库 `RequirementDerivation` 的元数据：
+     *
+     * <pre>
+     * #derivation connection {
+     *     end #original ::> vehicleMassRequirement;
+     *     end #derive ::> chassisMassRequirement;
+     * }
+     * </pre>
+     *
+     * 所以判据是"连接器带 `#derivation`，端带 `#original` / `#derive`"。连接器本身不必在
+     * 节点集里——它承载的是两个需求之间的关系，只要两端都在，边就成立。
+     */
+    private static void collectDeriveEdges(Map<Element, String> nodeIds, Map<String, Edge> edges) {
+        Set<Element> scanned = new LinkedHashSet<>();
+        for (Element element : nodeIds.keySet()) {
+            for (Element namespace = element.getOwner(); namespace != null; namespace = namespace.getOwner()) {
+                if (!scanned.add(namespace)) {
+                    // 属主链是共享的：这条链已经扫过，再往上只会重复
+                    break;
+                }
+                for (Relationship relationship : namespace.getOwnedRelationship()) {
+                    for (Element member : relationship.getOwnedRelatedElement()) {
+                        if (member instanceof Connector connector
+                                && metadataTypeOf(connector, DERIVATION_METADATA) != null) {
+                            addDerivationEdges(connector, nodeIds, edges);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 一条派生连接可以有多个原需求端与多个派生端，逐对出边。 */
+    private static void addDerivationEdges(Connector connector,
+                                           Map<Element, String> nodeIds,
+                                           Map<String, Edge> edges) {
+        List<Element> originals = new ArrayList<>();
+        List<Element> derived = new ArrayList<>();
+        for (Feature end : connector.getConnectorEnd()) {
+            Element target = resolveConnectorEnd(end, 0);
+            if (target == null) {
+                continue;
+            }
+            String tag = derivationTagOf(end, connector);
+            if (DERIVED_METADATA.equals(tag)) {
+                derived.add(target);
+            } else if (ORIGINAL_METADATA.equals(tag)) {
+                originals.add(target);
+            }
+        }
+        for (Element original : originals) {
+            for (Element derivedElement : derived) {
+                addEdgeIfResolved(edges, nodeIds, "derive", derivedElement, original, connector);
+            }
+        }
+    }
+
+    /**
+     * 端的派生标签。用法上的端常常没写元数据，此时按名字沿用连接定义里那个端的标签
+     * （`Requirements Examples/RequirementDerivationExample.sysml` 就是这个写法）。
+     */
+    private static String derivationTagOf(Feature end, Connector connector) {
+        String tag = metadataTypeOf(end, DERIVED_METADATA, ORIGINAL_METADATA);
+        if (tag != null || end.getName() == null) {
+            return tag;
+        }
+        for (Type type : connector.getType()) {
+            for (Feature candidate : type.getOwnedFeature()) {
+                if (!candidate.isEnd() || !end.getName().equals(candidate.getName())) {
+                    continue;
+                }
+                tag = metadataTypeOf(candidate, DERIVED_METADATA, ORIGINAL_METADATA);
+                if (tag != null) {
+                    return tag;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 元素上命中的元数据类型名（没有就返回 null）。 */
+    private static String metadataTypeOf(Element element, String... names) {
+        for (MetadataFeature metadata : metadataFeaturesOf(element)) {
+            for (Type type : metadata.getType()) {
+                String name = blankToNull(type.getName());
+                for (String candidate : names) {
+                    if (candidate.equals(name)) {
+                        return name;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 元素自有的元数据用法，即 `#name` 这类前缀注解。 */
+    private static List<MetadataFeature> metadataFeaturesOf(Element element) {
+        List<MetadataFeature> features = new ArrayList<>();
+        for (Relationship relationship : element.getOwnedRelationship()) {
+            for (Element related : relationship.getOwnedRelatedElement()) {
+                if (related instanceof MetadataFeature metadata && !features.contains(metadata)) {
+                    features.add(metadata);
+                }
+            }
+            if (relationship instanceof Annotation annotation
+                    && annotation.getAnnotatingElement() instanceof MetadataFeature metadata
+                    && !features.contains(metadata)) {
+                features.add(metadata);
+            }
+        }
+        return features;
+    }
+
+    /** 两端都能落到节点上才出边。 */
+    private static void addEdgeIfResolved(Map<String, Edge> edges,
+                                          Map<Element, String> nodeIds,
+                                          String kind,
+                                          Element source,
+                                          Element target,
+                                          Element authoredSource) {
+        String sourceId = source == null ? null : nodeIdFor(source, nodeIds);
+        String targetId = target == null ? null : nodeIdFor(target, nodeIds);
+        if (sourceId == null || targetId == null) {
+            return;
+        }
+        boolean authored = authoredSource != null && NodeModelUtils.findActualNodeFor(authoredSource) != null;
+        addEdge(edges, new Edge(kind, sourceId, targetId, authored));
     }
 
     /** 把连接器端解析到真实特征：匿名端走 reference subsetting，点路径走特征链。 */
@@ -846,6 +1105,43 @@ public final class ViewProductBuilder {
 
     private static int nodeNumber(String nodeId) {
         return Integer.parseInt(nodeId.substring(1));
+    }
+
+    /**
+     * 端点排序：产物里端点是节点编号（`n1`…），索引里端点是限定名，两种都要能排。
+     * 编号按数值排（`n2` 在 `n10` 前），其余按字典序。
+     */
+    private static Comparator<String> endComparator() {
+        return (left, right) -> {
+            boolean bothIds = isNodeId(left) && isNodeId(right);
+            return bothIds
+                    ? Integer.compare(nodeNumber(left), nodeNumber(right))
+                    : left.compareTo(right);
+        };
+    }
+
+    private static boolean isNodeId(String value) {
+        if (value == null || value.length() < 2 || value.charAt(0) != 'n') {
+            return false;
+        }
+        for (int i = 1; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 供**全模型索引**复用同一套关系推导规则：键换成元素的稳定引用（`ref`）即可。
+     *
+     * <p>产物与索引共用这里，保证"索引里的关系"和"视图里的关系"永远出自同一份规则，
+     * 不会各写一套后慢慢漂移。
+     */
+    public static List<ViewProduct.RelationshipRef> deriveRelations(Map<Element, String> idByElement,
+                                                                    List<Element> connectors,
+                                                                    boolean includeConnectors) {
+        return buildRelationships(idByElement, connectors, includeConnectors);
     }
 
     private static ViewProduct.SourceRef toSourceRef(Map<Resource, Integer> documentIds, Element element) {

@@ -149,6 +149,25 @@ public final class HtmlRenderer {
                               padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
               #layout-json { width: 100%; height: 200px; font-size: 11px; font-family: monospace;
                              border: 1px solid #e0e0e0; border-radius: 4px; resize: vertical; }
+              aside .crumbs { font-size: 11px; color: #666; margin-bottom: 8px; line-height: 1.8; }
+              aside .crumb { cursor: pointer; border-bottom: 1px dotted #bbb; }
+              aside .crumb:hover { color: #1a73e8; }
+              aside .crumb.current { color: #111; font-weight: 600; border-bottom: none; cursor: default; }
+              aside .crumb-sep { margin: 0 4px; color: #bbb; }
+              aside .relation-row { display: flex; gap: 6px; align-items: baseline; padding: 3px 6px;
+                                    border-radius: 4px; cursor: pointer; }
+              aside .relation-row:hover { background: #eef2f8; }
+              aside .relation-kind { color: #555; }
+              aside .relation-arrow { color: #888; }
+              aside .relation-target { color: #1a73e8; }
+              aside .relation-tag { color: #999; font-size: 10px; border: 1px solid #ddd;
+                                    border-radius: 3px; padding: 0 3px; }
+              aside .views { font-size: 12px; }
+              aside .view-link { display: block; color: #1a73e8; text-decoration: none;
+                                 padding: 3px 6px; border-radius: 4px; }
+              aside .view-link:hover { background: #eef2f8; }
+              aside .view-link.current { color: #111; font-weight: 600; cursor: default; }
+              aside .view-link.current::after { content: '（当前）'; color: #999; font-weight: 400; }
               .node.selected .box { stroke: #1a73e8; stroke-width: 2; }
             </style>
             </head>
@@ -157,9 +176,12 @@ public final class HtmlRenderer {
               <span class="title">__TITLE__</span>
               <span class="summary">__SUMMARY__</span>
               <span class="controls">
+                <button id="back" type="button" disabled>← 返回</button>
                 <button id="fit" type="button">适配</button>
                 <button id="reset" type="button">重置</button>
                 <button id="export-layout" type="button">导出布局</button>
+                <button id="local-view" type="button" disabled>局部视图</button>
+                <button id="impact" type="button" disabled>影响范围</button>
                 <label><input type="checkbox" id="hide-library"> 隐藏库元素</label>
                 <label><input type="checkbox" id="hide-implicit"> 隐藏隐式元素</label>
               </span>
@@ -170,7 +192,10 @@ public final class HtmlRenderer {
                 <ul id="outline"></ul>
               </nav>
               <div id="canvas">__SVG__</div>
-              <aside id="inspector"><p class="hint">点击节点查看元素信息</p></aside>
+              <aside id="inspector">
+                <div id="history-crumb" class="crumbs"></div>
+                <div id="inspector-body"><p class="hint">点击节点查看元素信息</p></div>
+              </aside>
             </main>
             <div id="layout-panel" hidden>
               <div class="panel-title">布局 JSON（另存为 layout.json，可用 -Layout 重新载入）</div>
@@ -186,7 +211,7 @@ public final class HtmlRenderer {
               var canvas = document.getElementById('canvas');
               var svg = canvas.querySelector('svg');
               var viewport = document.getElementById('viewport');
-              var inspector = document.getElementById('inspector');
+              var inspector = document.getElementById('inspector-body');
 
               // 让 SVG 铺满容器，使用像素坐标；缩放与平移由我们自己控制。
               svg.removeAttribute('viewBox');
@@ -312,7 +337,11 @@ public final class HtmlRenderer {
 
               svg.addEventListener('click', function (event) {
                 var group = event.target.closest('.node');
-                select(group ? group.dataset.id : null);
+                if (group) {
+                  navigateTo(group.dataset.id);
+                } else {
+                  select(null);
+                }
               });
               document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape') { select(null); }
@@ -328,10 +357,15 @@ public final class HtmlRenderer {
                   if (previous) { previous.classList.remove('selected'); }
                 }
                 selected = id;
-                if (!id) { inspector.innerHTML = '<p class="hint">点击节点查看元素信息</p>'; return; }
+                if (!id) {
+                  inspector.innerHTML = '<p class="hint">点击节点查看元素信息</p>';
+                  refreshActions();
+                  return;
+                }
                 var group = svg.querySelector('.node[data-id="' + id + '"]');
                 if (group) { group.classList.add('selected'); }
                 showInspector(nodeById(id));
+                refreshActions();
               }
 
               function row(list, label, value) {
@@ -386,23 +420,53 @@ public final class HtmlRenderer {
                 var related = product.relationships.filter(function (relationship) {
                   return relationship.source === node.id || relationship.target === node.id;
                 });
-                var text = related.length === 0
-                  ? '无出边或入边'
-                  : related.map(function (relationship) {
-                      var outgoing = relationship.source === node.id;
-                      var other = nodeById(outgoing ? relationship.target : relationship.source);
-                      var label = other ? (other.name || other.ref || other.metaclass) : '?';
-                      var arrow = outgoing ? '\u2192 ' : '\u2190 ';
-                      return relationship.kind + ' ' + arrow + label + (relationship.authored ? '' : '（推导）');
-                    }).join('\\n');
-                section.textContent = text;
-                section.style.whiteSpace = 'pre-line';
+                if (related.length === 0) {
+                  var empty = document.createElement('div');
+                  empty.className = 'hint';
+                  empty.textContent = '无出边或入边';
+                  section.appendChild(empty);
+                }
+                // 每条关系一行，点一下把中心切到对端——"查看相关元素"的核心交互
+                related.forEach(function (relationship) {
+                  var outgoing = relationship.source === node.id;
+                  var otherId = outgoing ? relationship.target : relationship.source;
+                  var other = nodeById(otherId);
+                  var row = document.createElement('div');
+                  row.className = 'relation-row';
+                  row.title = '跳转到 ' + (other && other.ref ? other.ref : otherId);
+
+                  var kind = document.createElement('span');
+                  kind.className = 'relation-kind';
+                  kind.textContent = relationship.kind;
+                  var arrow = document.createElement('span');
+                  arrow.className = 'relation-arrow';
+                  arrow.textContent = outgoing ? '\u2192' : '\u2190';
+                  var target = document.createElement('span');
+                  target.className = 'relation-target';
+                  target.textContent = other ? (other.name || other.ref || other.metaclass) : otherId;
+                  row.appendChild(kind);
+                  row.appendChild(arrow);
+                  row.appendChild(target);
+                  if (!relationship.authored) {
+                    var tag = document.createElement('span');
+                    tag.className = 'relation-tag';
+                    tag.textContent = '推导';
+                    row.appendChild(tag);
+                  }
+                  row.addEventListener('click', function () { navigateTo(otherId); });
+                  section.appendChild(row);
+                });
                 var caption = document.createElement('div');
                 caption.textContent = '关系';
                 caption.style.color = '#777';
                 caption.style.marginTop = '10px';
                 inspector.appendChild(caption);
                 inspector.appendChild(section);
+
+                // 跨视图跳转只有走 HTTP 时可用（file:// 没有服务端可查）
+                if (serverMode && node.ref) {
+                  appendViewsSection(node.ref);
+                }
               }
 
               function applyFilters() {
@@ -452,8 +516,7 @@ public final class HtmlRenderer {
                 label.textContent = node.name || node.ref || node.metaclass;
                 label.title = node.ref || node.metaclass;
                 label.addEventListener('click', function () {
-                  select(node.id);
-                  centerOn(node.id);
+                  navigateTo(node.id);
                 });
                 item.appendChild(label);
                 (byParent[node.id] || []).forEach(function (child) {
@@ -487,6 +550,125 @@ public final class HtmlRenderer {
               var documentUris = JSON.parse(document.getElementById('view-documents').textContent);
               buildOutline();
               fit();
+
+              // ---- 导航历史：点关系/大纲/节点都会记一步，可逐级退回 ----
+              var history = [];
+
+              /** 把中心切到某个元素并记入历史。 */
+              function navigateTo(id) {
+                if (!id) { return; }
+                if (history[history.length - 1] !== id) { history.push(id); }
+                select(id);
+                centerOn(id);
+                renderHistory();
+              }
+
+              function goBack() {
+                if (history.length < 2) { return; }
+                history.pop();
+                var id = history[history.length - 1];
+                select(id);
+                centerOn(id);
+                renderHistory();
+              }
+
+              /** 面包屑：显示走过的元素，点任意一级跳回那一层。 */
+              function renderHistory() {
+                var bar = document.getElementById('history-crumb');
+                bar.textContent = '';
+                history.forEach(function (id, index) {
+                  if (index > 0) {
+                    var separator = document.createElement('span');
+                    separator.className = 'crumb-sep';
+                    separator.textContent = '\u203a';
+                    bar.appendChild(separator);
+                  }
+                  var node = nodeById(id);
+                  var crumb = document.createElement('span');
+                  crumb.className = 'crumb' + (index === history.length - 1 ? ' current' : '');
+                  crumb.textContent = node ? (node.name || node.ref || node.metaclass) : id;
+                  crumb.addEventListener('click', function () {
+                    history = history.slice(0, index + 1);
+                    select(id);
+                    centerOn(id);
+                    renderHistory();
+                  });
+                  bar.appendChild(crumb);
+                });
+                document.getElementById('back').disabled = history.length < 2;
+              }
+
+              document.getElementById('back').addEventListener('click', goBack);
+
+              // ---- 服务端能力：跨视图跳转、局部视图、影响范围（只有 HTTP 下才有）----
+              var serverMode = location.protocol.indexOf('http') === 0;
+
+              function currentRef() {
+                var node = selected ? nodeById(selected) : null;
+                return node && node.ref ? node.ref : null;
+              }
+
+              function refreshActions() {
+                var enabled = serverMode && !!currentRef();
+                document.getElementById('local-view').disabled = !enabled;
+                document.getElementById('impact').disabled = !enabled;
+              }
+
+              /** 列出该元素出现的其他视图；点进去会切到那个视图并聚焦到同一元素。 */
+              function appendViewsSection(ref) {
+                var caption = document.createElement('div');
+                caption.textContent = '出现在视图';
+                caption.style.color = '#777';
+                caption.style.marginTop = '10px';
+                inspector.appendChild(caption);
+
+                var list = document.createElement('div');
+                list.className = 'views';
+                list.textContent = '查询中…';
+                inspector.appendChild(list);
+
+                fetch('/views?ref=' + encodeURIComponent(ref))
+                  .then(function (response) { return response.json(); })
+                  .then(function (views) {
+                    list.textContent = '';
+                    if (!views.length) {
+                      list.textContent = '没有出现在任何视图里';
+                      return;
+                    }
+                    views.forEach(function (viewRef) {
+                      var link = document.createElement('a');
+                      link.className = 'view-link';
+                      link.textContent = viewRef;
+                      var isCurrent = viewRef === product.view.ref;
+                      link.href = '/view?ref=' + encodeURIComponent(viewRef)
+                        + '&focus=' + encodeURIComponent(ref);
+                      if (isCurrent) { link.classList.add('current'); }
+                      list.appendChild(link);
+                    });
+                  })
+                  .catch(function () { list.textContent = '查询失败'; });
+              }
+
+              document.getElementById('local-view').addEventListener('click', function () {
+                var ref = currentRef();
+                if (ref) { window.open('/local?ref=' + encodeURIComponent(ref) + '&depth=1', '_blank'); }
+              });
+
+              document.getElementById('impact').addEventListener('click', function () {
+                var ref = currentRef();
+                if (ref) { window.open('/impact?ref=' + encodeURIComponent(ref) + '&depth=2', '_blank'); }
+              });
+
+              // 从别的视图跳过来时带着 focus=<ref>，落地就选中并居中
+              var focusRef = new URLSearchParams(location.search).get('focus');
+              if (focusRef) {
+                var focusNode = product.nodes.find(function (item) { return item.ref === focusRef; });
+                if (focusNode) {
+                  select(focusNode.id);
+                  centerOn(focusNode.id);
+                }
+              }
+              refreshActions();
 
               // 走 HTTP 时（`--serve`）轮询 /cursor：编辑器把光标位置发过去，这里高亮对应节点。
               // 这是"编辑器 → 图形"方向联动，做成 HTTP 通道后与具体编辑器解耦。

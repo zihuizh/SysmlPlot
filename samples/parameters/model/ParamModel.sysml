@@ -15,6 +15,16 @@ package ParamModel {
         out picture : Image;
     }
 
+    part def Camera;
+
+    // 动作用法（perform 需要引用用法，不能直接引用 action def）
+    action focusAction : Focus;
+
+    // 执行：部件 perform 一个动作用法
+    part camera : Camera {
+        perform focusAction;
+    }
+
     // 带值的属性应以 `values` 仓格呈现
     attribute def Settings {
         attribute exposure : Integer = 100;

@@ -83,6 +83,10 @@
         "source": { "$ref": "#/$defs/sourceRef" },
         "parent": { "type": "string", "pattern": "^n[0-9]+$" },
         "types": { "type": "array", "items": { "type": "string" } },
+        "reqId": {
+          "description": "需求编号（短名，如 <'1.1'>）",
+          "type": "string"
+        },
         "compartments": {
           "type": "array",
           "items": { "$ref": "#/$defs/compartment" }
@@ -121,7 +125,8 @@
         "kind": {
           "enum": [
             "containment", "typing", "specialization", "subsetting", "redefinition",
-            "connection", "satisfy", "allocate", "flow"
+            "connection", "satisfy", "verify", "derive", "allocate", "flow", "perform",
+            "succession"
           ]
         },
         "source": { "type": "string", "pattern": "^n[0-9]+$" },

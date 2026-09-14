@@ -44,6 +44,8 @@ public final class SysMLWorkspace {
     private final Path workspaceRoot;
     private final List<Resource> workspaceResources;
     private final String modelDigest;
+    /** 语义校验不便宜（实测 251 文件约 8.8s），工作区加载后不再变化，缓存一次即可。 */
+    private Integer cachedErrorCount;
 
     private SysMLWorkspace(SysMLInteractive sysml,
                            IResourceValidator validator,
@@ -130,6 +132,9 @@ public final class SysMLWorkspace {
     }
 
     public int errorCount() {
+        if (cachedErrorCount != null) {
+            return cachedErrorCount;
+        }
         int count = 0;
         for (Resource resource : workspaceResources) {
             for (Issue issue : validate(resource)) {
@@ -138,6 +143,7 @@ public final class SysMLWorkspace {
                 }
             }
         }
+        cachedErrorCount = count;
         return count;
     }
 
@@ -184,4 +190,3 @@ public final class SysMLWorkspace {
         }
     }
 }
-

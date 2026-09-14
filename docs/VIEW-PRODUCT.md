@@ -85,6 +85,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `source` | object? | | 源码位置；`implicit` 元素没有 |
 | `parent` | string? | | 包含它的节点 id（如果有） |
 | `types` | string[]? | | 声明的类型名（`types` 原文，不做继承展开） |
+| `reqId` | string? | | 需求编号：原文写的短名（`requirement <'1.1'> massLimitReq` → `1.1`）；只有需求类元素有 |
 | `compartments` | array? | | 仓格内容，见 2.3.1 |
 
 **不含 `elementId`**：实测 Pilot 每次加载都会为元素重新生成随机 UUID，同一个模型两次运行得到的
@@ -115,10 +116,15 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | `SubjectMembership` / `ActorMembership` / `StakeholderMembership` / `ObjectiveMembership` | `subject` / `actors` / `stakeholders` / `objectives` |
 | 带方向的特征 | `parameters` |
 | `BindingConnector` / `FlowUsage` / `SuccessionFlowUsage` | `bindings` / `flows` / `succession flows` |
+| 文档（`Documentation` 成员） | `documentation` |
 | 其余 | 元类名去 `Usage`/`Definition` 后缀、拆驼峰、复数化，如 `AttributeUsage` → `attributes` |
 
 **排序**（同样对齐官方）：参数优先且按 `in` → `out` → `inout`；然后按元类名；最后按名字。
 仓格之间按标题字典序。类型名在仓格里用简单名（与官方 PUML 输出一致），精确引用放条目的 `ref`。
+
+`documentation` 仓格收的是元素自有的 `doc` 文本，正文里的连续空白折叠为单空格；官方渲染把
+文档放在节点下方的独立区域（`VCompartment.addDocumentation`），所以它单独成格，不和
+`attributes` 之类混在一起。
 
 `source` 结构：`{ "document": int, "line": int, "offset": int, "length": int, "snippet": string? }`，
 `line` 从 1 开始，`offset` 是文档内字符偏移。`length` 是元素的文本范围，**包含其子元素**，
@@ -135,7 +141,7 @@ Cytoscape.js、yFiles）、需要坐标的确定性输出（Graphviz、ELK、Pla
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id` | string | 产物内编号，形如 `r1` |
-| `kind` | string | `containment` / `typing` / `specialization` / `subsetting` / `redefinition` |
+| `kind` | string | 关系类型，取值见第 3 节的词表 |
 | `source` | string | 起点节点 id |
 | `target` | string | 终点节点 id |
 | `authored` | bool | `true` = 用户文本里写出来的；`false` = 由语义推导 |
@@ -182,12 +188,24 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 | `redefinition` | 重定义（`:>>`） | 被重定义的特征 |
 | `connection` | 连接（`connect` / connection usage） | 连接器的另一个端点 |
 | `satisfy` | 满足需求（`satisfy X;`） | 被满足的需求 |
+| `verify` | 验证需求（`objective { verify X; }`） | 被验证的需求 |
+| `derive` | 需求派生（`#derivation connection` 的 `#derive` 端） | 原需求（派生需求的来源） |
 | `allocate` | 分配（`allocate x to y;`） | 被分配到的目标 |
 | `flow` | 流（`flow of T from a to b;`） | 流的终点 |
+| `perform` | 执行动作（`perform X;`） | 被执行的动作用法 |
+| `succession` | 时序（`first A then B;` / `then B;`） | 后继动作 |
 
 出边规则：**只画两端都在本产物节点集内的关系**——端点没被投影就不画边，也不会为了画边而
-补节点。四类语义关系只画文本里写出来的，隐式推导的不画；`containment` 两者都画，
-由 `authored` 如实标记。后续计划补 `verify`。
+补节点。`typing` / `specialization` / `subsetting` / `redefinition` 只画文本里写出来的，
+隐式推导的不画；`containment` 两者都画，由 `authored` 如实标记。
+
+两条边不止一个来源，判定方式写在实现里，这里记要点：
+
+- `derive` 不是关键字，而是标准库 `RequirementDerivation` 的元数据
+  （`#derivation connection` + 端上的 `#original` / `#derive`）。承载它的连接器**不必**是本
+  视图的节点——它连的是两个需求，只要两端在，边就成立；查找范围是各节点所属的命名空间。
+- `succession` 来自 `Succession`（`first A then B`、`then B`、`succession s first A then B`），
+  端点取 `getSource()` / `getTarget()`，与官方行为渲染（`VBehavior.addSuccession`）一致。
 
 ### 3.1 按视图类型的投影规则
 
@@ -195,8 +213,12 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 
 | 视图类型 | 投影差异 |
 |---|---|
-| `general` 及一切 `unclassified` | 所有暴露元素都是节点；连接器也是节点 |
-| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是 `connection` 边**；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
+| `general` 及一切 `unclassified` | 所有暴露元素都是节点；**被显式暴露**的连接器也是节点，其余连接器仍然画成边 |
+| `interconnection`（含 `actionFlow` / `stateTransition`） | **连接器不是节点，而是边**（`connection` / `flow` / `allocate` / `succession`）；连接器自己的端也不是节点；端口带 `placement: boundary` 挂在父节点边界上 |
+
+连接器的统一规则是**要么是节点、要么是边**，不会两者都是——否则同一个事实会被画两遍。
+`general` 视图里只有显式暴露的连接器是节点；由递归展开发现的那些（例如动作内部的
+`first A then B`）仍然画成边。
 
 端口贴在哪个节点上：优先端口属主本身（若已投影）；否则找"类型闭包包含该属主"的用法节点
 ——`tank : Tank` 上的端口来自 `Tank`，在互联视图里画在 `tank` 的边界上。
@@ -212,8 +234,10 @@ enumeration  connection  interface  flow  multiplicity  documentation  other
 1. `expose` 直接求值出的元素（官方实现在 `ViewUsage.getExposedElement()` 里已合并 expose 与 filter）；
 2. 递归展开：上述元素**自有的结构特征**——端口、有向特征（参数）、部件、项、动作、状态、
    出现（occurrence）。连接器除外，它由视图类型决定是边还是仓格条目；
-3. **数据特征不进范围**：无方向的属性、值以仓格（`compartments`）形式呈现；
-4. 上限 200 个节点，超出即截断并在 `completeness.reasons` 里记 `scope-truncated`。
+3. **`perform x;` 会把被执行的动作用法拉进范围**：`perform` 本身是边、不占节点，但它的目标
+   若不在节点集里，边的一端就落不到节点上、整条边会消失（实测），因此显式补进来；
+4. **数据特征不进范围**：无方向的属性、值以仓格（`compartments`）形式呈现；
+5. 上限 200 个节点，超出即截断并在 `completeness.reasons` 里记 `scope-truncated`。
 
 边界元素（`placement = boundary`）的附着关系由 `parent` 表达，**不额外生成边**；渲染器据此
 把元素画在父节点边界上，也不在两者之间画连线。
@@ -319,6 +343,8 @@ onSelect(nodeId | null)   → 语义引用       // 宿主据此做属性面板�
 | 拖动节点（边界元素随所属节点移动） | `nodes[].placement` / `parent` |
 | 拖动后重算连线 | `relationships[].source/target` |
 | 导出布局（面板里给出 layout JSON） | `modelDigest` / `view.ref` / 布局对象 |
+| 关系可点击导航（点对端换中心） | `relationships[].source/target` + `nodes[].name` |
+| 导航历史（面包屑 + 后退） | 产物内的 `nodes[].id`（本地导航，不跨产物） |
 
 导出的布局可以另存为 `layout.json`，再用 `-Layout` 载入重放。闭环**已实测**：自动布局时
 `n3` 在 `(206,184)`，手工改成 `(406,284)` 后重放，渲染结果与之一致。
@@ -336,6 +362,20 @@ GET  /cursor?path=…&line=…&col=…    设置光标位置（编辑器调用�
 页面（走 HTTP 时）每 700ms 轮询 `/cursor`，若有结果就高亮并居中**最内层**那个节点，
 检查器同步显示它的信息与关系。这样"编辑器光标 → 图上高亮"不需要绑定某个编辑器——
 VS Code 扩展、其他 IDE、一个快捷键脚本都能驱动它，编辑器侧只要发一次 HTTP 请求。
+
+服务还提供阶段 3 的三组按需接口（都只在 HTTP 下可用，`file://` 打开时前端会跳过）：
+
+| 接口 | 用途 |
+|---|---|
+| `GET /views?ref=` | 该元素出现在哪些视图（检查器里的"出现在视图"） |
+| `GET /neighbors?ref=` | 一跳邻居（JSON） |
+| `GET /impact?ref=&depth=` | 影响范围表格页（含源码位置列） |
+| `GET /local?ref=&depth=` | 以该元素为中心的**局部关系视图**（普通产物渲染） |
+| `GET /view?ref=&focus=` | 切到另一个视图并聚焦到指定元素 |
+
+局部视图是**产物变换**：`LocalViewBuilder` 把 N 跳邻域做成一份符合同一契约的产物，
+因此 SVG / PNG / 交互页三种出口对它天然可用。它的取数范围是**整个模型**而不是当前视图
+——否则点中一个元素后，若邻居没被当前视图 expose，就地找邻居会什么都找不到。
 
 > 实现上刻意用阻塞式 `ServerSocket` 手写，没用 `com.sun.net.httpserver`：后者依赖
 > `Selector`，而 `Selector` 初始化要开一对回环 socket 作唤醒管道，在受限环境里会被拒绝

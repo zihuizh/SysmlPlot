@@ -47,6 +47,7 @@ public final class PilotSpike {
         String pumlView = null;
         String svgView = null;
         String outFile = null;
+        String allPumlDir = null;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -56,6 +57,7 @@ public final class PilotSpike {
                 case "--puml" -> pumlView = args[++i];
                 case "--svg" -> svgView = args[++i];
                 case "--out" -> outFile = args[++i];
+                case "--all-puml" -> allPumlDir = args[++i];
                 default -> throw new IllegalArgumentException("unknown argument: " + args[i]);
             }
         }
@@ -137,6 +139,25 @@ public final class PilotSpike {
             if (!result.hasException()) {
                 System.out.println(result.getPlantUML());
             }
+        }
+
+        if (allPumlDir != null) {
+            Path target = Path.of(allPumlDir).toAbsolutePath();
+            Files.createDirectories(target);
+            int written = 0;
+            for (ViewUsage view : findAllViews(inputs)) {
+                String ref = view.getQualifiedName();
+                if (ref == null) {
+                    continue;
+                }
+                VizResult result = sysml.view(ref, new ArrayList<>(),
+                        new ArrayList<>(List.of("PUMLCODE")), new ArrayList<>());
+                String slug = ref.replaceAll("[^A-Za-z0-9._-]+", "-");
+                String body = result.hasException() ? "ERROR " + result.formatException() : result.getPlantUML();
+                Files.writeString(target.resolve(slug + ".puml.txt"), body, StandardCharsets.UTF_8);
+                written++;
+            }
+            System.out.printf("[all-puml] %d view(s) written to %s%n", written, target);
         }
 
         if (svgView != null) {

@@ -44,6 +44,7 @@ public final class ViewProduct {
                           SourceRef source,
                           String parent,
                           List<String> types,
+                          String reqId,
                           List<CompartmentRef> compartments) {
     }
 

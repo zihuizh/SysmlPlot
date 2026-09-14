@@ -28,20 +28,60 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1
 **刻意不做"必须完全相等"的断言**：官方渲染有它自己的选择（递归进已暴露元素、重复画同一
 元素、省略无名元素、把参数画成端口），差异需要人来判断。这个脚本的职责是把差异摆出来。
 
-## 当前结果（2026-09-10）
+### 比较前的归一化
 
-七个样例视图的节点名集合**全部一致**，无 missing：
+官方 PUML 的标签带一些**表示层**的装饰，不剥掉会变成假阳性（实测踩过两次）：
+
+| 装饰 | 例子 | 处理 |
+|---|---|---|
+| 多重性后缀 | `seatBelt[2]` | 剥掉尾部 `[...]` |
+| 需求编号前缀 | `~<1.1> massLimitReq` | 剥掉前置的 `~<…>` |
+| 构造型前缀 | `«part» tank` | 剥掉 `«…»`（SysON 对比同理） |
+| 类型后缀 | `tank: Tank` | 只取 `:` 之前的一段 |
+
+前两条在 `scripts/oracle_diff.py` 的 `normalize_label()` 里，第三、四条在
+`scripts/diff-syson.py` 里。
+
+## 当前结果（2026-09-14）
+
+十一个样例视图的节点名集合**无 missing**：
 
 | 样例 | 官方节点 | 我方节点 | 官方边 | 我方边 |
 |---|---:|---:|---:|---:|
 | vehicle / structure | 3 | 3 | 2 | 2 |
 | structure / parts | 10 | 10 | 18 | 13 |
-| interconnection / power | 5 | 5 | 5 | 3 |
-| parameters / values | 6 | 7 | 0 | 4 |
+| interconnection / power | 5 | 7 | 5 | 3 |
+| parameters / values（含 `perform`） | 8 | 9 | 1 | 6 |
 | expose / membership（`expose vehicle;`） | 4 | 4 | 2 | 3 |
 | expose / namespace（`expose ExposeModel::*;`） | 6 | 6 | 4 | 5 |
 | expose / recursive（`expose vehicle::**;`） | 4 | 4 | 2 | 3 |
+| requirements / satisfy（`satisfy` + `verify` + `derive`） | 5 | 6 | 3 | 5 |
 | flows / allocate（`flow` + `allocate`） | 8 | 9 | 10 | 6 |
+| actions / flow（`succession` + `flow`） | 5 | 7 | 3 | 6 |
+| actions / structure（同一模型，General 视图） | 5 | 7 | 3 | 6 |
+
+"官方节点"已按标签去重；我方多出的部分是**已知差异**里的表示选择，不是漏画：
+`interconnection` 多 `fuelSupply`（第 7 条）、`requirements` 多 `testVehicle`
+（验证用例的 `subject`，官方渲染不画它，但也因此不画它到需求的那条线）、`actions` 多
+`photo`（`Shoot` 的输出参数没被任何流引用，官方就不画它，我们按"有向特征进范围"一律物化）。
+
+### 语义边的对照情况
+
+| 边 | 有官方对照吗 | 依据 |
+|---|---|---|
+| `satisfy` | 有 | `requirements` 样例：官方画 `«satisfy»` 边 |
+| `allocate` / `flow` | 有 | `flows` 样例：官方画粗点线边与 `from`/`to` 边 |
+| `succession` | **有**（本轮新发现） | `samples/actions` 的 ActionFlow 视图：官方画出 `setup --> focus`、`focus --> shoot`（后者带 `focusThenShoot` 标签），与我们的一一对应 |
+| `verify` | 无 | 官方渲染器不画，按 `RequirementVerificationMembership` 的语义实现，靠样例人工核对 |
+| `derive` | 无 | 官方渲染器不画需求派生，按标准库 `RequirementDerivation` 的语义实现，靠样例人工核对 |
+| `perform` | 无 | 官方把它并入 `perform` 特征、不单独画边，按 `PerformActionUsage` 的语义实现，靠样例人工核对 |
+
+`succession` 能被对照上值得记一笔：官方 `VComposite.caseSuccession` 返回空，但
+`VBehavior.addSuccession` 是画边的，而 `view()` 会按视图挑渲染器——所以动作类视图是有对照物的。
+
+顺带一个观察：官方对 `action flow`（ActionFlowView）与 `action structure`（GeneralView）
+**输出完全相同**，它并不按视图定义区分渲染。我们按 `view.kind` 区分投影规则，两个视图的
+节点集仍与官方一致。
 
 后三个样例（`samples/expose-forms`）同时覆盖**视图定义继承**：filter 写在 `Structure Base`
 上，三个视图都用派生的 `Structure Derived`，实测条件被正确继承（隐式多重性、库元素都没有

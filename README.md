@@ -12,6 +12,11 @@ SysML v2 视图生成与查看工具。以 SysML v2 文本为事实源，按标�
 | `docs/DEVELOPMENT.md` | **开发规范**：分支与提交、目录命名、代码与文档约定、验证要求、提交前检查 |
 | `docs/ROADMAP.md` | 阶段划分与各阶段验收标准 |
 | `docs/PHASE-1-PLAN.md` | 阶段 1 技术方案：解析器接入、视图求值、产物契约 |
+| `docs/PHASE-3-PLAN.md` | 阶段 3 计划：模型查询、追溯矩阵、验收（T0–T4）与性能基线 |
+| `docs/VIEW-PRODUCT.md` | **视图产物契约**：字段、词表、暴露范围、排序与渲染器契约 |
+| `docs/ORACLE-DIFF.md` | 与官方渲染、SysON 的差分验证结论（含已知差异的原因） |
+| `docs/PERF-BASELINE.md` | 性能基线：分档耗时与瓶颈定位 |
+| `docs/BACKLOG.md` | 已知但尚未做的事情 |
 | `docs/ENVIRONMENT.md` | 本机已验证的环境事实与依赖位置 |
 
 ## 远程仓库
@@ -45,6 +50,9 @@ powershell -ExecutionPolicy Bypass -File scripts\diff-oracle.ps1                
 powershell -ExecutionPolicy Bypass -File scripts\render-png.ps1 -View "VehicleViews::'vehicle structure'" -Out build\view.png
 powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -View "StructureViews::'structure (parts)'" -Workspace samples/structure -At "samples\structure\model\StructureModel.sysml:20:20"
 powershell -ExecutionPolicy Bypass -File scripts\serve-view.ps1 -Workspace samples/structure -View "StructureViews::'structure (parts)'" -Port 8765
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -Workspace samples/requirements -Matrix          # 需求追溯矩阵
+powershell -ExecutionPolicy Bypass -File scripts\run-view.ps1 -Workspace samples/requirements -Matrix -GapsOnly -Gate   # 覆盖率门禁（有缺口 → 退出码 4）
+powershell -ExecutionPolicy Bypass -File scripts\check-trace.ps1                              # 对"应当无缺口"的工作区跑门禁
 python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（需本机 SysON 在跑）
 ```
 
@@ -62,8 +70,10 @@ python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（�
 
 ## 当前状态
 
-阶段 0 完成（评估与仓库初始化），阶段 1 准备开工：
-**接入 OMG 官方解析器（SysML v2 Pilot Implementation），按 `view` / `expose` 机制生成视图。**
+阶段 0（评估）、阶段 1（解析与视图生成）、阶段 2（可用 MVP）已完成并合并进 `main`。
+阶段 3 正在收尾——**模型查询与追溯**：全模型索引、关系导航、跨视图跳转、局部关系视图、
+影响范围分析、需求追溯矩阵与覆盖率门禁都已实现（分支 `feat/model-index`），
+正在跑全量语料验收（T3）与性能复测（T4）。
 
 ## 关键约束
 

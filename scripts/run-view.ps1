@@ -7,7 +7,18 @@ param(
     [string]$Html,
     [string]$Layout,
     [string]$EmitLayout,
-    [string]$At
+    [string]$At,
+    [string]$Index,
+    [switch]$Check,
+    [string]$Report,
+    [string]$AllViews,
+    [string]$Query,
+    [string]$Ref,
+    [int]$Depth = 1,
+    [string]$LocalView,
+    [switch]$Matrix,
+    [switch]$GapsOnly,
+    [switch]$Gate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +26,12 @@ $ErrorActionPreference = 'Stop'
 
 # 允许调用方传绝对路径（例如差分脚本把产物写到 build 下的临时目录）
 function Resolve-OutPath([string]$Path) {
+    if ([System.IO.Path]::IsPathRooted($Path)) { return $Path }
+    return (Join-Path $script:RepoRoot $Path)
+}
+
+# -Workspace 也允许绝对路径（例如指向官方语料目录）
+function Resolve-WorkspacePath([string]$Path) {
     if ([System.IO.Path]::IsPathRooted($Path)) { return $Path }
     return (Join-Path $script:RepoRoot $Path)
 }
@@ -27,7 +44,7 @@ $argsList = @(
     '-cp', "$classes;$script:PilotClasspath",
     $mainClass,
     '--libdir', $script:SysMLLibDir,
-    '--workspace', (Join-Path $script:RepoRoot $Workspace)
+    '--workspace', (Resolve-WorkspacePath $Workspace)
 )
 if ($View) { $argsList += @('--view', $View) }
 if ($Out) { $argsList += @('--out', (Resolve-OutPath $Out)) }
@@ -36,6 +53,15 @@ if ($Html) { $argsList += @('--html', (Resolve-OutPath $Html)) }
 if ($Layout) { $argsList += @('--layout', (Resolve-OutPath $Layout)) }
 if ($EmitLayout) { $argsList += @('--emit-layout', (Resolve-OutPath $EmitLayout)) }
 if ($At) { $argsList += @('--at', $At) }
+if ($Index) { $argsList += @('--index', (Resolve-OutPath $Index)) }
+if ($Check) { $argsList += @('--check') }
+if ($Report) { $argsList += @('--report', (Resolve-OutPath $Report)) }
+if ($AllViews) { $argsList += @('--all-views', (Resolve-OutPath $AllViews)) }
+if ($Query) { $argsList += @('--query', $Query, '--ref', $Ref, '--depth', $Depth) }
+if ($LocalView) { $argsList += @('--local-view', $LocalView, '--depth', $Depth) }
+if ($Matrix) { $argsList += '--matrix' }
+if ($GapsOnly) { $argsList += '--gaps-only' }
+if ($Gate) { $argsList += '--gate' }
 
 $result = Invoke-NativeCommand -Exe $script:JavaExe -Arguments $argsList
 $result.Output | ForEach-Object { Write-Host $_ }
