@@ -13,6 +13,7 @@ SysML v2 视图生成与查看工具。以 SysML v2 文本为事实源，按标�
 | `docs/ROADMAP.md` | 阶段划分与各阶段验收标准 |
 | `docs/VIEW-PRODUCT.md` | **视图产物契约**：字段、词表、暴露范围、排序与渲染器契约 |
 | `docs/GRAPH-LIB-P0.md` | 图库框架 P0：G6 与 Cytoscape 原型和实测结果 |
+| `docs/GRAPH-LIB-P1.md` | 图库框架 P1：原生布局、交互与动画的实测与选型结论 |
 | `docs/ORACLE-DIFF.md` | 与官方渲染、SysON 的差分验证结论（含已知差异的原因） |
 | `docs/PERF-BASELINE.md` | 性能基线：分档耗时与瓶颈定位 |
 | `docs/BACKLOG.md` | 已知但尚未做的事情 |
@@ -74,8 +75,9 @@ python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（�
 已完成阶段的计划和验收记录已移入 `docs/archive/`。
 
 当前重点是**展示层升级**。项目已确定采用图库框架承接视图产物之后的布局、交互和动画，
-具体框架仍在试验。现有自研布局和渲染器保留为基线与兼容出口，不再作为主要演进方向。
-当前工作和选择标准见 `docs/ROADMAP.md`、`docs/GRAPH-LIB-P0.md` 与 `docs/BACKLOG.md`。
+并已选定 **G6 5.1.1** 作为展示层框架（Cytoscape 保留为体积敏感的备选）。现有自研布局和
+渲染器保留为基线与兼容出口，不再作为主要演进方向。P1 原型与实测数据见
+`docs/GRAPH-LIB-P1.md`；当前工作和选择标准见 `docs/ROADMAP.md` 与 `docs/BACKLOG.md`。
 
 ## 关键约束
 
