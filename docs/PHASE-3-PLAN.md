@@ -17,7 +17,7 @@
 | 3 | 改动元素 E 会影响哪些需求？ | ✅ 反向可达查询（`--query impact`、`/impact`） |
 | 4 | 哪些需求没有任何实现或验证？ | ✅ 追溯矩阵 + 覆盖率门禁（`--matrix --gaps-only --gate`） |
 | 5 | 同一元素出现在哪些视图里？ | ✅ 已验证（同一 ref 出现在 3 个视图） |
-| 6 | 以某元素为中心，它连到谁？ | 🟡 有 1 跳关系，但不可点击、无多跳、无局部图 |
+| 6 | 以某元素为中心，它连到谁？ | ✅ 一跳关系可点击换中心 + 多跳局部关系视图（S3-1 / S3-4） |
 
 ## 2. 范围与非目标
 
@@ -170,7 +170,7 @@ S3-2 是关键路径：S3-3/4/5/7 都挂在它上面。S3-1 与 S3-6 可与它�
 
 | 层级 | 范围 | 跑法 | 通过标准 | 频率 |
 |---|---|---|---|---|
-| **T0 样例回归** | `samples/` 的 9 个自建样例、18 个文件（12 个视图） | `scripts/diff-oracle.ps1` + 确定性比对 + schema 校验 + `scripts/check-trace.ps1` | 与官方渲染零 missing；两次运行产物逐字节一致；全部过 schema；应当无缺口的工作区真的没有缺口 | 每次提交（pre-commit 覆盖样例校验与覆盖率门禁） |
+| **T0 样例回归** | `samples/` 的 10 个自建样例（`bindings` 计入） | `scripts/diff-oracle.ps1` + `scripts/check-products.ps1`（期望产物 + schema + 确定性）+ `scripts/check-trace.ps1` | 与官方渲染零 missing；与 `tests/golden` 逐字节一致；全部过 schema；应当无缺口的工作区真的没有缺口 | 每次提交（pre-commit 覆盖样例校验、覆盖率门禁与产物回归） |
 | **T1 语料解析验收** | 官方 SysML v2 Release 全量 403 个 `.sysml`/`.kerml` | `run-view.ps1 -Workspace <corpus> -Check -Report …` | 逐文件错误数可复算；与官方工具 `validate` 的差异逐条解释 | 手动 / 每个工作项收尾 |
 | **T2 官方视图验收** | 语料里含 `view`/`expose` 的 5 个模型 | 生成产物 + 与官方 PUML 差分 | 零 missing；产物两次一致 | 手动 / 阶段收尾 |
 | **T3 扩面验收** | 语料里**没有 view** 的 246 个模型 | 自动生成 view 包装（见 5.2）+ T2 同样的检查 | 全部能生成产物；与官方渲染一致或差异可解释 | 手动 / 阶段收尾 |
@@ -322,6 +322,31 @@ load 242.3s、check 9.2s——与首次一致，说明阶段 3 的改动没有�
 矩阵数字可复算：`gaps` 就是稀疏列表里带 `[缺口]` 的行数；`--gaps-only` 的输出与
 `--gate` 的判据同源（都读 `TraceMatrix.Matrix.gaps()`）。
 
+**T0 产物回归自动化（2026-09-14）**
+
+T0 里原先靠手工的两件事（确定性比对、schema 校验）和一件从没做过的事（期望产物入库）
+固定成 `scripts/check-products.ps1`，并进了 pre-commit：
+
+| 检查 | 做法 | 实测结果 |
+|---|---|---|
+| 期望产物比对 | 每个样例出一次产物，与 `tests/golden/` 逐字节比对（绝对 URI 前缀已换成 `file://<WORKSPACE>/…`，换机器/换目录也能比） | 10 个样例、18 份产物一致 |
+| schema 校验 | 同一批产物过 `schema/view-product.schema.json` | 18 份全部合格 |
+| 确定性 | 同一输入跑两遍逐字节比对（默认抽 2 个样例，`-Full` 覆盖全部） | 两次一致 |
+
+单次约 2 分钟；产物有意变化时用 `-Update` 重建期望产物并与代码一起提交。
+
+**两处契约级修复（2026-09-14，都在上面这批检查的保护下）**
+
+| 问题 | 结论 |
+|---|---|
+| 仓格标题算错：裸 `Usage` → `s`、`SuccessionAsUsage` → `succession ases` | 按官方 `Sysml2PlantUMLText.getStereotypeName` 的正则重写（含 `AsUsage`、裸 `Usage`、`Enumeration`、`" def"` 分支）；受影响样例行已复核为 `usages` / `successions` |
+| `bind` 在互联视图里不成边（官方画 `a -[thickness=5]- b : =`） | `BindingConnector` 收进连接器集合，新增 `relationship.kind = binding`；新增样例 `samples/bindings` 作对照 |
+
+**全量语料复核（2026-09-14，248 个工作区 / 304 份产物）**：坏标题 **0 个**——
+`usages` 3 处、`successions` 2 处，正是修复后的正确标题（修复前是 `s` / `succession ases`）；
+全语料新增 `binding` 边 **8 条**；`211 / 248` 零错误出产物的结论、以及 37 个跨目录 import
+断链工作区与官方诊断 `37 / 37` 一致，均与修复前相同（输入未变、诊断代码未动）。
+
 ## 5.3 性能校验
 
 **要测的指标**（分阶段计时，避免只有总数看不出瓶颈）：
@@ -395,7 +420,7 @@ load 242.3s、check 9.2s——与首次一致，说明阶段 3 的改动没有�
 | T1 全量语料跑批 | ✅ 已跑（`sysml/src` 251 文件：0 错误 / 11 警告；基线见 `docs/PERF-BASELINE.md`） |
 | T4 性能基线首版 | ✅ 已建（14 / 10 / 50 / 100 / 251 五档；瓶颈在官方解析器链接，约 1 秒/文件） |
 | T3 语料视图生成器 | ✅ 已实现（`scripts/make-corpus-views.py`）；30 个模型 29/29 通过，248 全量待跑 |
-| T2 官方视图验收 | ✅ 已跑（12 个官方视图：7 个可比且零 missing；5 个官方渲染器自身不支持） |
+| T2 官方视图验收 | ✅ 已跑（12 个官方视图零 missing；其中 3 个有官方对照，其余是官方渲染器自身拒绝渲染的类型） |
 | S3-1 关系可导航 | ✅ 已完成（关系条目可点击换中心 + 面包屑 + 后退；三层往返已自动验证） |
 | S3-2 查询层（引擎侧） | ✅ 已完成（`ModelQuery`：邻居 / 影响范围 / 子图 / 所属视图；`--query` 可命令行验证） |
 | S3-2 预览服务按需接口 | ✅ 已完成（`/views`、`/neighbors`、`/impact`、`/local`、`/view?focus=`） |

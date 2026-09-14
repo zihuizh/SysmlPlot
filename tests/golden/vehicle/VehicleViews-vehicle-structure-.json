@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:5664c1f9d5a7c04a182427ec8404e0e80964767c64fef8d55903e611ce1202e7",
+  "view": {
+    "ref": "VehicleViews::'vehicle structure'",
+    "name": "vehicle structure",
+    "definition": "Part Structure View",
+    "kind": "unclassified",
+    "rendering": "asTreeDiagram",
+    "source": {
+      "document": 1,
+      "line": 13,
+      "offset": 288,
+      "length": 114,
+      "snippet": "view 'vehicle structure' : 'Part Structure View' { expose vehicle::**; render asTreeDiagram; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/VehicleModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/VehicleViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "VehicleModel::vehicle",
+      "name": "vehicle",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 8,
+        "offset": 135,
+        "length": 241,
+        "snippet": "part vehicle : Vehicle { attribute mass : Real = 1500; part engine : Engine { attribute power : Real; } part transmission : Transmission { attribute gearCount …"
+      },
+      "types": [
+        "VehicleModel::Vehicle"
+      ],
+      "compartments": [
+        {
+          "title": "attributes",
+          "entries": [
+            {
+              "text": "mass: Real",
+              "ref": "VehicleModel::vehicle::mass"
+            }
+          ]
+        },
+        {
+          "title": "values",
+          "entries": [
+            {
+              "text": "mass = 1500",
+              "ref": "VehicleModel::vehicle::mass"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n2",
+      "ref": "VehicleModel::vehicle::engine",
+      "name": "engine",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 10,
+        "offset": 206,
+        "length": 68,
+        "snippet": "part engine : Engine { attribute power : Real; }"
+      },
+      "parent": "n1",
+      "types": [
+        "VehicleModel::Engine"
+      ],
+      "compartments": [
+        {
+          "title": "attributes",
+          "entries": [
+            {
+              "text": "power: Real",
+              "ref": "VehicleModel::vehicle::engine::power"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n3",
+      "ref": "VehicleModel::vehicle::transmission",
+      "name": "transmission",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 13,
+        "offset": 283,
+        "length": 87,
+        "snippet": "part transmission : Transmission { attribute gearCount : Integer; }"
+      },
+      "parent": "n1",
+      "types": [
+        "VehicleModel::Transmission"
+      ],
+      "compartments": [
+        {
+          "title": "attributes",
+          "entries": [
+            {
+              "text": "gearCount: Integer",
+              "ref": "VehicleModel::vehicle::transmission::gearCount"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "containment",
+      "source": "n1",
+      "target": "n2",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n1",
+      "target": "n3",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

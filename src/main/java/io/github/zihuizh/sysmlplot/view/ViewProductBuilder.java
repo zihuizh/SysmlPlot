@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.xtext.nodemodel.INode;
@@ -99,6 +101,14 @@ public final class ViewProductBuilder {
     private static final String DERIVATION_METADATA = "DerivationMetadata";
     private static final String DERIVED_METADATA = "DerivedRequirementMetadata";
     private static final String ORIGINAL_METADATA = "OriginalRequirementMetadata";
+
+    /** 元类名里的构造型后缀，照搬官方 `getStereotypeName` 的正则。 */
+    private static final Pattern METACLASS_NAME =
+            Pattern.compile("^((Enum)(?>eration)|(\\p{L}+?))(Definition|Usage|AsUsage)$");
+
+    /** 驼峰与字母/符号边界插空格，照搬官方的 `convertCamelName`。 */
+    private static final Pattern CAMEL_BOUNDARY =
+            Pattern.compile("(?<=[A-Z])(?=[A-Z][a-z])|(?<=[^A-Z])(?=[A-Z])|(?<=[A-Za-z])(?=[^A-Za-z])");
 
     private ViewProductBuilder() {
     }
@@ -280,10 +290,12 @@ public final class ViewProductBuilder {
 
     /** 会变成边的连接类特征。 */
     private static boolean isConnectorFeature(Feature feature) {
-        // succession（`first A then B`）也是连接器：它跟流一样是"两个元素之间的关系"，
-        // 在互联类视图里应当画成边，而不是又一个框。
+        // 连接器都是"两个元素之间的关系"，在互联类视图里画成边而不是又一个框：
+        // - succession：`first A then B` / `then B`
+        // - binding：`bind a = b`（官方画成标 `=` 的粗边）
+        // 漏掉其中任何一个，视图就会少画一条边（`bind` 曾经就是这样丢的）。
         return feature instanceof ConnectionUsage || feature instanceof FlowUsage
-                || feature instanceof Succession;
+                || feature instanceof Succession || feature instanceof BindingConnector;
     }
 
     /** 结构特征 = 会画成框的东西；连接器除外（由投影决定它是边还是仓格条目）。 */
@@ -685,23 +697,33 @@ public final class ViewProductBuilder {
         return pluralize(stereotypeOf(feature.eClass().getName()));
     }
 
-    /** `AttributeUsage` → `attribute`：去掉 Usage/Definition 后缀并拆驼峰。 */
+    /**
+     * 元类名里的"构造型名"，规则照搬官方 `SysML2PlantUMLText.getStereotypeName`：
+     *
+     * <pre>
+     * ^((Enum)(?&gt;eration)|(\p{L}+?))(Definition|Usage|AsUsage)$
+     * </pre>
+     *
+     * <p>三个容易写错的点，都是踩过的坑：
+     *
+     * <ul>
+     *   <li>后缀有 **三个**：`Definition` / `Usage` / `AsUsage`。只去 `Usage` 会把
+     *       `SuccessionAsUsage` 拆成 `succession as`，复数化后得到 `succession ases`；</li>
+     *   <li>裸 `Usage` / `Definition` **不匹配**该正则（前面至少要有一个字母），要走整名小写，
+     *       否则拆出空串、复数化成 `s`；</li>
+     *   <li>`Enumeration*` 取 `Enum` 而不是 `Enumeration`。</li>
+     * </ul>
+     */
     private static String stereotypeOf(String metaclass) {
         String base = metaclass;
-        if (base.endsWith("Definition")) {
-            base = base.substring(0, base.length() - "Definition".length());
-        } else if (base.endsWith("Usage")) {
-            base = base.substring(0, base.length() - "Usage".length());
-        }
-        StringBuilder text = new StringBuilder(base.length() + 4);
-        for (int i = 0; i < base.length(); i++) {
-            char c = base.charAt(i);
-            if (Character.isUpperCase(c) && i > 0) {
-                text.append(' ');
+        Matcher matcher = METACLASS_NAME.matcher(base);
+        if (matcher.matches()) {
+            base = matcher.group(2) != null ? matcher.group(2) : matcher.group(3);
+            if ("Definition".equals(matcher.group(4))) {
+                base = base + " def";
             }
-            text.append(Character.toLowerCase(c));
         }
-        return text.toString();
+        return CAMEL_BOUNDARY.matcher(base).replaceAll(" ").toLowerCase(Locale.ROOT);
     }
 
     private static String pluralize(String word) {
@@ -810,6 +832,10 @@ public final class ViewProductBuilder {
         // 时序（`first A then B` / `then B`）：官方在行为视图里画成带 `then` 的箭头
         if (element instanceof Succession) {
             return "succession";
+        }
+        // 绑定（`bind a = b`）：官方画成标 `=` 的粗边
+        if (element instanceof BindingConnector) {
+            return "binding";
         }
         return "connection";
     }

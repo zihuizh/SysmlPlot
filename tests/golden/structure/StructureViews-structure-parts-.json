@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:714a84a5128706c4f9d2e911a69612cfd66b4a35b8768efabe695033a3b4c9a9",
+  "view": {
+    "ref": "StructureViews::'structure (parts)'",
+    "name": "structure (parts)",
+    "definition": "Structure View",
+    "kind": "unclassified",
+    "source": {
+      "document": 1,
+      "line": 17,
+      "offset": 353,
+      "length": 256,
+      "snippet": "view 'structure (parts)' : 'Structure View' { filter @SysML::PartUsage or @SysML::PartDefinition; expose car::**; expose Car::**; expose SportsCar::**; expose …"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/StructureModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/StructureViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "StructureModel::Axle",
+      "name": "Axle",
+      "metaclass": "PartDefinition",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 5,
+        "offset": 88,
+        "length": 14,
+        "snippet": "part def Axle;"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "StructureModel::Car",
+      "name": "Car",
+      "metaclass": "PartDefinition",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 9,
+        "offset": 153,
+        "length": 57,
+        "snippet": "part def Car :> Vehicle { part axle : Axle; }"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "StructureModel::Car::axle",
+      "name": "axle",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 10,
+        "offset": 187,
+        "length": 17,
+        "snippet": "part axle : Axle;"
+      },
+      "parent": "n2",
+      "types": [
+        "StructureModel::Axle"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "StructureModel::SportsCar",
+      "name": "SportsCar",
+      "metaclass": "PartDefinition",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 14,
+        "offset": 252,
+        "length": 80,
+        "snippet": "part def SportsCar :> Car { part sportsAxle : Axle redefines axle; }"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n5",
+      "ref": "StructureModel::SportsCar::sportsAxle",
+      "name": "sportsAxle",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 15,
+        "offset": 288,
+        "length": 38,
+        "snippet": "part sportsAxle : Axle redefines axle;"
+      },
+      "parent": "n4",
+      "types": [
+        "StructureModel::Axle"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n6",
+      "ref": "StructureModel::Vehicle",
+      "name": "Vehicle",
+      "metaclass": "PartDefinition",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 4,
+        "offset": 66,
+        "length": 17,
+        "snippet": "part def Vehicle;"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n7",
+      "ref": "StructureModel::Wheel",
+      "name": "Wheel",
+      "metaclass": "PartDefinition",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 6,
+        "offset": 107,
+        "length": 15,
+        "snippet": "part def Wheel;"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n8",
+      "ref": "StructureModel::car",
+      "name": "car",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 19,
+        "offset": 354,
+        "length": 101,
+        "snippet": "part car : Car { part wheels : Wheel[4]; part frontLeft : Wheel subsets wheels; }"
+      },
+      "types": [
+        "StructureModel::Car"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n9",
+      "ref": "StructureModel::car::frontLeft",
+      "name": "frontLeft",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 21,
+        "offset": 411,
+        "length": 38,
+        "snippet": "part frontLeft : Wheel subsets wheels;"
+      },
+      "parent": "n8",
+      "types": [
+        "StructureModel::Wheel"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n10",
+      "ref": "StructureModel::car::wheels",
+      "name": "wheels",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 20,
+        "offset": 379,
+        "length": 23,
+        "snippet": "part wheels : Wheel[4];"
+      },
+      "parent": "n8",
+      "types": [
+        "StructureModel::Wheel"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "containment",
+      "source": "n2",
+      "target": "n3",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n4",
+      "target": "n5",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "containment",
+      "source": "n8",
+      "target": "n9",
+      "authored": true
+    },
+    {
+      "id": "r4",
+      "kind": "containment",
+      "source": "n8",
+      "target": "n10",
+      "authored": true
+    },
+    {
+      "id": "r5",
+      "kind": "redefinition",
+      "source": "n5",
+      "target": "n3",
+      "authored": true
+    },
+    {
+      "id": "r6",
+      "kind": "specialization",
+      "source": "n2",
+      "target": "n6",
+      "authored": true
+    },
+    {
+      "id": "r7",
+      "kind": "specialization",
+      "source": "n4",
+      "target": "n2",
+      "authored": true
+    },
+    {
+      "id": "r8",
+      "kind": "subsetting",
+      "source": "n9",
+      "target": "n10",
+      "authored": true
+    },
+    {
+      "id": "r9",
+      "kind": "typing",
+      "source": "n3",
+      "target": "n1",
+      "authored": true
+    },
+    {
+      "id": "r10",
+      "kind": "typing",
+      "source": "n5",
+      "target": "n1",
+      "authored": true
+    },
+    {
+      "id": "r11",
+      "kind": "typing",
+      "source": "n8",
+      "target": "n2",
+      "authored": true
+    },
+    {
+      "id": "r12",
+      "kind": "typing",
+      "source": "n9",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r13",
+      "kind": "typing",
+      "source": "n10",
+      "target": "n7",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

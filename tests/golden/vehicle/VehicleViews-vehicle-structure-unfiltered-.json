@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:5664c1f9d5a7c04a182427ec8404e0e80964767c64fef8d55903e611ce1202e7",
+  "view": {
+    "ref": "VehicleViews::'vehicle structure (unfiltered)'",
+    "name": "vehicle structure (unfiltered)",
+    "definition": "Unfiltered View",
+    "kind": "unclassified",
+    "source": {
+      "document": 2,
+      "line": 26,
+      "offset": 668,
+      "length": 93,
+      "snippet": "view 'vehicle structure (unfiltered)' : 'Unfiltered View' { expose vehicle::**; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<EXTERNAL>/Base.kerml",
+      "workspace": false
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/model/VehicleModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 2,
+      "uri": "file://<WORKSPACE>/views/VehicleViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "Base::DataValue::self",
+      "name": "self",
+      "metaclass": "Feature",
+      "graphic": "other",
+      "origin": "library",
+      "source": {
+        "document": 0,
+        "line": 31,
+        "offset": 827,
+        "length": 49,
+        "snippet": "feature self: DataValue redefines Anything::self;"
+      },
+      "types": [
+        "Base::DataValue"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "VehicleModel::vehicle",
+      "name": "vehicle",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 8,
+        "offset": 135,
+        "length": 241,
+        "snippet": "part vehicle : Vehicle { attribute mass : Real = 1500; part engine : Engine { attribute power : Real; } part transmission : Transmission { attribute gearCount …"
+      },
+      "types": [
+        "VehicleModel::Vehicle"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "VehicleModel::vehicle::engine",
+      "name": "engine",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 10,
+        "offset": 206,
+        "length": 68,
+        "snippet": "part engine : Engine { attribute power : Real; }"
+      },
+      "parent": "n2",
+      "types": [
+        "VehicleModel::Engine"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "VehicleModel::vehicle::engine::power",
+      "name": "power",
+      "metaclass": "AttributeUsage",
+      "graphic": "attribute",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 11,
+        "offset": 241,
+        "length": 23,
+        "snippet": "attribute power : Real;"
+      },
+      "parent": "n3",
+      "types": [
+        "ScalarValues::Real"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n5",
+      "ref": "VehicleModel::vehicle::mass",
+      "name": "mass",
+      "metaclass": "AttributeUsage",
+      "graphic": "attribute",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 9,
+        "offset": 168,
+        "length": 29,
+        "snippet": "attribute mass : Real = 1500;"
+      },
+      "parent": "n2",
+      "types": [
+        "ScalarValues::Real"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n6",
+      "ref": "VehicleModel::vehicle::transmission",
+      "name": "transmission",
+      "metaclass": "PartUsage",
+      "graphic": "part",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 13,
+        "offset": 283,
+        "length": 87,
+        "snippet": "part transmission : Transmission { attribute gearCount : Integer; }"
+      },
+      "parent": "n2",
+      "types": [
+        "VehicleModel::Transmission"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n7",
+      "ref": "VehicleModel::vehicle::transmission::gearCount",
+      "name": "gearCount",
+      "metaclass": "AttributeUsage",
+      "graphic": "attribute",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 14,
+        "offset": 330,
+        "length": 30,
+        "snippet": "attribute gearCount : Integer;"
+      },
+      "parent": "n6",
+      "types": [
+        "ScalarValues::Integer"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n8",
+      "metaclass": "Documentation",
+      "graphic": "documentation",
+      "origin": "library",
+      "source": {
+        "document": 0,
+        "line": 9,
+        "offset": 223,
+        "length": 89,
+        "snippet": "doc /* * Anything is the top level generalized type in the language. */"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n9",
+      "metaclass": "Documentation",
+      "graphic": "documentation",
+      "origin": "library",
+      "source": {
+        "document": 0,
+        "line": 25,
+        "offset": 696,
+        "length": 123,
+        "snippet": "doc /* * Value is the most general classifier of entities that are values that do not change * over time. */"
+      },
+      "types": [],
+      "compartments": []
+    },
+    {
+      "id": "n10",
+      "metaclass": "LiteralInteger",
+      "graphic": "other",
+      "origin": "workspace",
+      "source": {
+        "document": 1,
+        "line": 9,
+        "offset": 192,
+        "length": 4,
+        "snippet": "1500"
+      },
+      "parent": "n5",
+      "types": [
+        "Performances::LiteralIntegerEvaluation"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n11",
+      "metaclass": "Multiplicity",
+      "graphic": "multiplicity",
+      "origin": "implicit",
+      "parent": "n5",
+      "types": [
+        "ScalarValues::Natural"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n12",
+      "metaclass": "Multiplicity",
+      "graphic": "multiplicity",
+      "origin": "implicit",
+      "parent": "n3",
+      "types": [
+        "ScalarValues::Natural"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n13",
+      "metaclass": "Multiplicity",
+      "graphic": "multiplicity",
+      "origin": "implicit",
+      "parent": "n4",
+      "types": [
+        "ScalarValues::Natural"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n14",
+      "metaclass": "Multiplicity",
+      "graphic": "multiplicity",
+      "origin": "implicit",
+      "parent": "n6",
+      "types": [
+        "ScalarValues::Natural"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n15",
+      "metaclass": "Multiplicity",
+      "graphic": "multiplicity",
+      "origin": "implicit",
+      "parent": "n7",
+      "types": [
+        "ScalarValues::Natural"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "containment",
+      "source": "n2",
+      "target": "n3",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n2",
+      "target": "n5",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "containment",
+      "source": "n2",
+      "target": "n6",
+      "authored": true
+    },
+    {
+      "id": "r4",
+      "kind": "containment",
+      "source": "n3",
+      "target": "n4",
+      "authored": true
+    },
+    {
+      "id": "r5",
+      "kind": "containment",
+      "source": "n3",
+      "target": "n12",
+      "authored": false
+    },
+    {
+      "id": "r6",
+      "kind": "containment",
+      "source": "n4",
+      "target": "n13",
+      "authored": false
+    },
+    {
+      "id": "r7",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n10",
+      "authored": true
+    },
+    {
+      "id": "r8",
+      "kind": "containment",
+      "source": "n5",
+      "target": "n11",
+      "authored": false
+    },
+    {
+      "id": "r9",
+      "kind": "containment",
+      "source": "n6",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r10",
+      "kind": "containment",
+      "source": "n6",
+      "target": "n14",
+      "authored": false
+    },
+    {
+      "id": "r11",
+      "kind": "containment",
+      "source": "n7",
+      "target": "n15",
+      "authored": false
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

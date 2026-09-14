@@ -124,6 +124,29 @@ if grep -Eq '^(samples|src)/' "$list"; then
     fi
 fi
 
+# --- 5. 产物回归（期望产物 + schema + 抽样确定性）---------------------------
+# 约两分钟：10 个样例各出一次产物，与 tests/golden 逐字节比对，再抽两个样例比对确定性。
+if grep -Eq '^(samples|src|schema)/' "$list"; then
+    shell_bin=''
+    if command -v pwsh >/dev/null 2>&1; then
+        shell_bin=pwsh
+    elif command -v powershell >/dev/null 2>&1; then
+        shell_bin=powershell
+    fi
+    if [ -z "$shell_bin" ]; then
+        say '跳过产物回归：未找到 PowerShell'
+    else
+        products_log=${TMPDIR:-/tmp}/sysmlplot-products.log
+        say '产物回归（tests/golden + schema + 确定性）...'
+        if "$shell_bin" -NoProfile -ExecutionPolicy Bypass -File scripts/check-products.ps1 >"$products_log" 2>&1; then
+            ok "$(grep -c '\[ok\]' "$products_log" 2>/dev/null || echo 0) 项检查通过"
+        else
+            bad '产物回归未通过'
+            sed 's/^/      /' "$products_log" | tail -n 20
+        fi
+    fi
+fi
+
 if [ "$fail" -ne 0 ]; then
     printf '\n提交被阻止。规则见 docs/DEVELOPMENT.md，紧急情况可 git commit --no-verify。\n'
     exit 1

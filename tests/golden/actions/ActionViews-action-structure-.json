@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 0,
+  "modelDigest": "sha256:eafe90c975bb1707faca8c285ce5075b9a3416a1fb345bc14c10488a54485da7",
+  "view": {
+    "ref": "ActionViews::'action structure'",
+    "name": "action structure",
+    "definition": "GeneralView",
+    "kind": "general",
+    "source": {
+      "document": 1,
+      "line": 11,
+      "offset": 261,
+      "length": 69,
+      "snippet": "view 'action structure' : GeneralView { expose capture; }"
+    }
+  },
+  "documents": [
+    {
+      "id": 0,
+      "uri": "file://<WORKSPACE>/model/ActionModel.sysml",
+      "workspace": true
+    },
+    {
+      "id": 1,
+      "uri": "file://<WORKSPACE>/views/ActionViews.sysml",
+      "workspace": true
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "ref": "ActionModel::Focus::picture",
+      "name": "picture",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 7,
+        "offset": 116,
+        "length": 20,
+        "snippet": "out picture : Image;"
+      },
+      "parent": "n5",
+      "types": [
+        "ActionModel::Image"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n2",
+      "ref": "ActionModel::Shoot::photo",
+      "name": "photo",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 12,
+        "offset": 203,
+        "length": 18,
+        "snippet": "out photo : Image;"
+      },
+      "parent": "n7",
+      "types": [
+        "ActionModel::Image"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n3",
+      "ref": "ActionModel::Shoot::picture",
+      "name": "picture",
+      "metaclass": "ReferenceUsage",
+      "graphic": "other",
+      "origin": "workspace",
+      "placement": "boundary",
+      "source": {
+        "document": 0,
+        "line": 11,
+        "offset": 175,
+        "length": 19,
+        "snippet": "in picture : Image;"
+      },
+      "parent": "n7",
+      "types": [
+        "ActionModel::Image"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n4",
+      "ref": "ActionModel::capture",
+      "name": "capture",
+      "metaclass": "ActionUsage",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 16,
+        "offset": 292,
+        "length": 255,
+        "snippet": "action capture { action setup; action focus : Focus; action shoot : Shoot; first setup then focus; succession focusThenShoot first focus then shoot; flow of Im…"
+      },
+      "types": [
+        "Actions::Action"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n5",
+      "ref": "ActionModel::capture::focus",
+      "name": "focus",
+      "metaclass": "ActionUsage",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 18,
+        "offset": 339,
+        "length": 21,
+        "snippet": "action focus : Focus;"
+      },
+      "parent": "n4",
+      "types": [
+        "ActionModel::Focus"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n6",
+      "ref": "ActionModel::capture::setup",
+      "name": "setup",
+      "metaclass": "ActionUsage",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 17,
+        "offset": 317,
+        "length": 13,
+        "snippet": "action setup;"
+      },
+      "parent": "n4",
+      "types": [
+        "Actions::Action"
+      ],
+      "compartments": []
+    },
+    {
+      "id": "n7",
+      "ref": "ActionModel::capture::shoot",
+      "name": "shoot",
+      "metaclass": "ActionUsage",
+      "graphic": "action",
+      "origin": "workspace",
+      "source": {
+        "document": 0,
+        "line": 19,
+        "offset": 369,
+        "length": 21,
+        "snippet": "action shoot : Shoot;"
+      },
+      "parent": "n4",
+      "types": [
+        "ActionModel::Shoot"
+      ],
+      "compartments": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "kind": "containment",
+      "source": "n4",
+      "target": "n5",
+      "authored": true
+    },
+    {
+      "id": "r2",
+      "kind": "containment",
+      "source": "n4",
+      "target": "n6",
+      "authored": true
+    },
+    {
+      "id": "r3",
+      "kind": "containment",
+      "source": "n4",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r4",
+      "kind": "flow",
+      "source": "n5",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r5",
+      "kind": "succession",
+      "source": "n5",
+      "target": "n7",
+      "authored": true
+    },
+    {
+      "id": "r6",
+      "kind": "succession",
+      "source": "n6",
+      "target": "n5",
+      "authored": true
+    }
+  ],
+  "completeness": {
+    "complete": true,
+    "reasons": []
+  }
+}

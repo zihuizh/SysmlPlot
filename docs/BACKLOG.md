@@ -17,7 +17,8 @@
 
 ### 2. 按视图类型分投影（部分完成）
 
-- ✅ **Interconnection**：连接器变边、端口贴节点边界（`view.kind` + `placement` + `connection`）
+- ✅ **Interconnection**：连接器变边、端口贴节点边界（`view.kind` + `placement` + `connection` /
+  `flow` / `allocate` / `succession` / `binding`）
 - 🟡 **Action Flow**：动作是节点、`succession` 与 `flow` 是边（已完成，样例 `samples/actions`）；
   控制节点（fork/join/decision/merge）、守卫与 trigger 仍未做
 - ❌ **State Transition**：状态节点 + 带 trigger/guard/effect 的迁移边
@@ -28,6 +29,8 @@
 ### 3. 仓格与源码联动 ✅（已完成）
 
 - ✅ **仓格**：`nodes[].compartments`，标题规则与排序对齐官方 `VCompartment`
+  （2026-09-14 修过一次真错：`stereotypeOf` 少了 `AsUsage` 分支、也没处理裸 `Usage`，
+  实测出现 `s` / `succession ases` 这种标题；现在按官方 `getStereotypeName` 的正则实现）
 - ✅ **源码联动（单向）**：`source.snippet` 带原文片段，交互式页面里可显示来源并跳转编辑器
   （`vscode://file/<path>:<line>`）
 - ❌ **反向联动**：编辑器光标位置驱动图上高亮，需要编辑器宿主（VS Code 扩展或 LSP 客户端）
@@ -47,7 +50,8 @@
 `scripts/diff-oracle.ps1` + `scripts/oracle_diff.py`：对四个样例视图比较节点名集合与边数量，
 结论与已知差异见 `docs/ORACLE-DIFF.md`。目前四个样例节点名集合全部一致。
 
-后续：把差分验证纳入提交前检查（当前需手动运行，单次约 50 秒，放钩子里太重）。
+后续：**官方差分仍是手动**（12 个视图一轮约 3 分钟）；进 pre-commit 的是产物回归
+（`scripts/check-products.ps1`：期望产物 + schema + 抽样确定性，约 2 分钟）。
 
 ## 阶段 3 的支撑项
 
@@ -64,7 +68,7 @@
 | 大模型性能 | 已测（`docs/PERF-BASELINE.md`）：瓶颈是官方解析与链接（251 文件 load 232s，约 0.9 s/文件），我们的索引/矩阵只有 94 / 79 ms/文件。真要提速得走增量加载、缓存或复用 JVM |
 | 增量产物 | 现在每次全量生成 |
 | 行为视图专有规则 | Action Flow / State Transition 目前按 interconnection 规则投影；规范符号（控制节点、守卫、trigger/effect）待做 |
-| 快照回归与布局稳定性测试 | 现在只有"两次运行产物一致"的即时比对，还没有跨提交的快照回归 |
+| 快照回归与布局稳定性测试 | ✅ 产物快照回归已做（`tests/golden` + `scripts/check-products.ps1`，已进 pre-commit）；**布局稳定性**还没做（改布局算法后坐标无基线） |
 
 ## 语义与质量待验证项
 
@@ -80,5 +84,5 @@
 | 项 | 说明 |
 |---|---|
 | 功能分支清理 | `feat/pilot-parser-spike`、`feat/view-product`、`feat/svg-renderer`、`feat/interactive-renderer` 已合并且本地/远端都还在，待统一删除 |
-| pre-commit 未覆盖产物回归 | 钩子目前做样例解析校验 + 覆盖率门禁；产物与渲染结果的回归比对还没进钩子（全量太慢） |
-| 没有单元测试框架 | 验证目前靠命令行脚本 + 人工比对，尚未引入测试目录与断言 |
+| ~~pre-commit 未覆盖产物回归~~ | ✅ 已覆盖（2026-09-14）：样例解析校验 + 覆盖率门禁 + **产物回归**（期望产物/schema/抽样确定性）。官方差分与全量语料仍手动 |
+| 没有单元测试框架 | 验证仍靠命令行脚本 + 人工比对；产物回归已脚本化，但没有 JUnit/断言框架，也没有布局与渲染的断言 |
