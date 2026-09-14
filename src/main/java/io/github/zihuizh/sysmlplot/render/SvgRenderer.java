@@ -28,13 +28,18 @@ public final class SvgRenderer {
     private static final double REASON_LINE = 16;
     private static final double NODE_HEIGHT = 40;
     private static final double PORT_SIZE = 18;
+    /** 端口上的载荷特征（嵌套边界元素）画小一号，避免和端口本身混淆。 */
+    private static final double NESTED_PORT_SIZE = 12;
+    /** 同一侧端口之间、以及嵌套端口与外层端口之间的间距。 */
+    private static final double PORT_GAP = 6;
     /** 边界元素标签画在方块左侧，预留的宽度（用于避免整体越界）。 */
     private static final double PORT_LABEL_ALLOWANCE = 44;
     /** 需要画标签的边类型；包含/类型/特化/子集化/重定义这类结构边不加标签（会糊成一片）。 */
     private static final Set<String> LABELLED_EDGE_KINDS = Set.of("satisfy", "verify", "allocate", "flow");
     private static final double LINE_HEIGHT = 14;
     private static final double COMPARTMENT_PAD = 6;
-    private static final double H_GAP = 72;
+    /** 横向间距要容得下两侧相对而立的端口 + 载荷特征（实测 72 时会在中间挤成一团）。 */
+    private static final double H_GAP = 96;
     private static final double V_GAP = 64;
     private static final double MIN_NODE_WIDTH = 96;
     private static final double MAX_NODE_WIDTH = 360;
@@ -137,7 +142,12 @@ public final class SvgRenderer {
                     nodeHeight(node)));
         }
 
-        // 边界元素（端口）不参与树布局，贴在父节点的左边界上依次排开。
+        // 边界元素（端口）不参与树布局，贴父节点的边上。
+        //
+        // 关键：贴**哪一**条边不是随意的——要贴"朝向对端的那一侧"。第一版一律贴左边，
+        // 结果是 `samples/interconnection` 里 tank 的 outlet 与 engine 的 inlet 分别在
+        // 两个节点的左边，连线必须横穿整个 engine 才够到出口（实测坐标见 PR）。
+        // 没有对端的端口（例如只在仓格里出现的有向特征）沿用左侧。
         Map<String, Integer> boundaryIndex = new LinkedHashMap<>();
         double orphanCursor = 0;
         // 边界元素之间也会嵌套（端口上的载荷特征挂在端口上），必须按嵌套深度从外到内摆，
@@ -149,6 +159,17 @@ public final class SvgRenderer {
             }
         }
         boundaryNodes.sort(Comparator.comparingInt(node -> boundaryDepth(node, byId)));
+
+        Map<String, Side> sides = new LinkedHashMap<>();
+        for (ViewProduct.NodeRef node : boundaryNodes) {
+            sides.put(node.id(), portSide(node, product, boxes, byId, sides));
+        }
+        Map<String, Integer> sideCounts = new LinkedHashMap<>();
+        for (ViewProduct.NodeRef node : boundaryNodes) {
+            if (boxes.containsKey(node.parent()) && !isBoundary(byId.get(node.parent()))) {
+                sideCounts.merge(node.parent() + "/" + sides.get(node.id()), 1, Integer::sum);
+            }
+        }
         for (ViewProduct.NodeRef node : boundaryNodes) {
             Layout.Box parentBox = boxes.get(node.parent());
             double size = PORT_SIZE;
@@ -158,12 +179,16 @@ public final class SvgRenderer {
                 orphanCursor += 1;
                 continue;
             }
-            int index = boundaryIndex.merge(node.parent(), 1, Integer::sum) - 1;
-            boxes.put(node.id(), new Layout.Box(
-                    parentBox.x() - size / 2,
-                    parentBox.y() + 12 + index * (size + 12),
-                    size,
-                    size));
+            Side side = sides.get(node.id());
+            ViewProduct.NodeRef parent = byId.get(node.parent());
+            if (parent != null && isBoundary(parent)) {
+                // 嵌套边界元素：贴着外层端口再往外一格，保持同一个朝向
+                boxes.put(node.id(), nestedPortBox(parentBox, side, NESTED_PORT_SIZE));
+                continue;
+            }
+            int index = boundaryIndex.merge(node.parent() + "/" + side, 1, Integer::sum) - 1;
+            int count = sideCounts.getOrDefault(node.parent() + "/" + side, 1);
+            boxes.put(node.id(), portBox(parentBox, side, index, count, size));
         }
 
         // 边界元素的标签画在方块左侧，可能落到画布外；整体右移到最左侧不越界为止。
@@ -197,6 +222,182 @@ public final class SvgRenderer {
             parent = byId.get(parent).parent();
         }
         return depth;
+    }
+
+    /** 边界元素贴在父节点哪条边上。 */
+    private enum Side {
+        LEFT, RIGHT, TOP, BOTTOM
+    }
+
+    /**
+     * 端口该贴哪一侧：**面向它在这个视图里连到的对端**。
+     *
+     * <p>判据是"父节点中心 → 对端节点中心"的主方向（横向优先，与连线的正交走线规则一致）。
+     * 对端不在本视图里、或者根本没有对端时退回 {@link Side#LEFT}（保持与旧版一致）。
+     * 端口上的载荷特征这类嵌套边界元素直接沿用所属端口的朝向。
+     */
+    private static Side portSide(ViewProduct.NodeRef node,
+                                 ViewProduct.Product product,
+                                 Map<String, Layout.Box> boxes,
+                                 Map<String, ViewProduct.NodeRef> byId,
+                                 Map<String, Side> decided) {
+        ViewProduct.NodeRef parent = byId.get(node.parent());
+        if (parent != null && isBoundary(parent)) {
+            Side inherited = decided.get(parent.id());
+            if (inherited != null) {
+                return inherited;
+            }
+        }
+        Layout.Box own = boxes.get(node.parent());
+        if (own == null) {
+            return Side.LEFT;
+        }
+        List<String> peers = new ArrayList<>();
+        for (ViewProduct.RelationshipRef relationship : product.relationships()) {
+            if (isAttachment(product, relationship)) {
+                continue;
+            }
+            if (node.id().equals(relationship.source())) {
+                peers.add(relationship.target());
+            } else if (node.id().equals(relationship.target())) {
+                peers.add(relationship.source());
+            }
+        }
+        peers.sort(Comparator.naturalOrder());
+        for (String peerId : peers) {
+            ViewProduct.NodeRef peer = byId.get(peerId);
+            Layout.Box peerBox = boxes.get(peerId);
+            // 对端本身也可能是端口（port→port 的连接）：上溯到它附着的主体节点再判方向，
+            // 否则"端口连端口"这类最常见的互联视图会全部退回默认的左侧。
+            while (peer != null && isBoundary(peer)) {
+                peer = byId.get(peer.parent());
+                peerBox = peer == null ? null : boxes.get(peer.id());
+            }
+            if (peer == null || peerBox == null || isBoundary(peer)) {
+                continue;
+            }
+            return sideTowards(own, peerBox);
+        }
+        return Side.LEFT;
+    }
+
+    /** 从 own 看向 peer 的主方向（横向优先）。 */
+    private static Side sideTowards(Layout.Box own, Layout.Box peer) {
+        double dx = (peer.x() + peer.width() / 2) - (own.x() + own.width() / 2);
+        double dy = (peer.y() + peer.height() / 2) - (own.y() + own.height() / 2);
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            return dx >= 0 ? Side.RIGHT : Side.LEFT;
+        }
+        return dy >= 0 ? Side.BOTTOM : Side.TOP;
+    }
+
+    /** 一条边的走线：路径 + 标签锚点。 */
+    record Route(String path, double labelX, double labelY) {
+    }
+
+    /**
+     * 端口标签：画在**父节点框的内侧**（贴左边缘的端口，标签在其右；贴右边缘的在其左；
+     * 上下同理）。
+     *
+     * <p>第一版把标签一律画在方块外侧：两个相对而立的端口（engine 的 inlet 与 tank 的 outlet）
+     * 把标签全塞进中间那道空隙里，四个标签叠成一团（实测截图）。挪到框内之后，
+     * 空隙只留给连线。
+     *
+     * <p>嵌套端口（端口上的载荷特征）没有"内侧"可言——它自己就贴在父端口外面——
+     * 标签统一放在方块下方，避开同排的其他标签。
+     */
+    private static String portLabel(ViewProduct.NodeRef node,
+                                    Layout.Box box,
+                                    Layout.LayoutFile layout,
+                                    Map<String, ViewProduct.NodeRef> byId,
+                                    String label) {
+        ViewProduct.NodeRef parent = node.parent() == null ? null : byId.get(node.parent());
+        Layout.Box parentBox = node.parent() == null ? null : layout.nodes().get(node.parent());
+        if (parent != null && isBoundary(parent)) {
+            // 载荷特征不重复标名字：外层端口已经标了，两块标签会挤在节点之间的空隙里
+            // （名字仍在 `<g data-ref=…>` 里，检查器/悬浮可见）。
+            return "";
+        }
+        Side side = parentBox == null ? Side.LEFT : sideTowards(parentBox, box);
+        return switch (side) {
+            // 标签画在方块**上方**、水平对齐方块中心：既不与节点名/元类抢正中那块地方
+            // （框内正中间是节点名与元类，实测会叠字），也不与外侧的载荷特征方块抢位置。
+            case LEFT -> String.format(Locale.ROOT,
+                    "        <text class=\"port-name\" x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\">%s</text>\n",
+                    box.width() / 2, -5.0, escape(label));
+            case RIGHT -> String.format(Locale.ROOT,
+                    "        <text class=\"port-name\" x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\">%s</text>\n",
+                    box.width() / 2, -5.0, escape(label));
+            case TOP -> String.format(Locale.ROOT,
+                    "        <text class=\"port-name\" x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\">%s</text>\n",
+                    box.width() / 2, -5.0, escape(label));
+            case BOTTOM -> String.format(Locale.ROOT,
+                    "        <text class=\"port-name\" x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\">%s</text>\n",
+                    box.width() / 2, box.height() + 12.0, escape(label));
+        };
+    }
+
+    /**
+     * 连线的正交走线：从**源框朝向目标的那条边**的中点出发，接到**目标框朝向源的那条边**的中点。
+     *
+     * <p>第一版用的是"源框底中心 → 目标框顶中心"，两个节点并排时这条线会横穿中间那个节点
+     * （`samples/interconnection` 实测：outlet→inlet 的线从 tank 左边缘横穿 engine 本体）。
+     * 现在按主方向选边：横向关系走"右→左"或"左→右"，纵向关系走"下→上"或"上→下"。
+     *
+     * <p><b>注意</b>：{@code HtmlRenderer} 里的 JS {@code routePath()} 是这份逻辑的镜像
+     * （拖动节点后要重算连线），改这里必须同步改那里。
+     */
+    static Route route(Layout.Box source, Layout.Box target) {
+        double scx = source.x() + source.width() / 2;
+        double scy = source.y() + source.height() / 2;
+        double tcx = target.x() + target.width() / 2;
+        double tcy = target.y() + target.height() / 2;
+        double dx = tcx - scx;
+        double dy = tcy - scy;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            double x1 = dx >= 0 ? source.x() + source.width() : source.x();
+            double x2 = dx >= 0 ? target.x() : target.x() + target.width();
+            double midX = (x1 + x2) / 2;
+            return new Route(String.format(Locale.ROOT,
+                    "M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f",
+                    x1, scy, midX, scy, midX, tcy, x2, tcy),
+                    midX, (scy + tcy) / 2 - 4.0);
+        }
+        double y1 = dy >= 0 ? source.y() + source.height() : source.y();
+        double y2 = dy >= 0 ? target.y() : target.y() + target.height();
+        double midY = (y1 + y2) / 2;
+        return new Route(String.format(Locale.ROOT,
+                "M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f",
+                scx, y1, scx, midY, tcx, midY, tcx, y2),
+                (scx + tcx) / 2, midY - 4.0);
+    }
+
+    /** 端口方块骑在父节点该侧的边上；同一侧有多个时沿该边居中排开。 */
+    private static Layout.Box portBox(Layout.Box parentBox, Side side, int index, int count, double size) {
+        double step = size + PORT_GAP;
+        double offset = (index - (count - 1) / 2.0) * step;
+        double alongX = parentBox.x() + parentBox.width() / 2 + offset;
+        double alongY = parentBox.y() + parentBox.height() / 2 + offset;
+        return switch (side) {
+            case LEFT -> new Layout.Box(parentBox.x() - size / 2, alongY - size / 2, size, size);
+            case RIGHT -> new Layout.Box(
+                    parentBox.x() + parentBox.width() - size / 2, alongY - size / 2, size, size);
+            case TOP -> new Layout.Box(alongX - size / 2, parentBox.y() - size / 2, size, size);
+            case BOTTOM -> new Layout.Box(
+                    alongX - size / 2, parentBox.y() + parentBox.height() - size / 2, size, size);
+        };
+    }
+
+    /** 嵌套边界元素（端口上的载荷特征）：紧挨外层端口再往外一格，保持同一朝向。 */
+    private static Layout.Box nestedPortBox(Layout.Box parentPort, Side side, double size) {
+        return switch (side) {
+            case LEFT -> new Layout.Box(parentPort.x() - size - PORT_GAP, parentPort.y(), size, size);
+            case RIGHT -> new Layout.Box(
+                    parentPort.x() + parentPort.width() + PORT_GAP, parentPort.y(), size, size);
+            case TOP -> new Layout.Box(parentPort.x(), parentPort.y() - size - PORT_GAP, size, size);
+            case BOTTOM -> new Layout.Box(
+                    parentPort.x(), parentPort.y() + parentPort.height() + PORT_GAP, size, size);
+        };
     }
 
     private static boolean isBoundary(ViewProduct.NodeRef node) {
@@ -277,6 +478,10 @@ public final class SvgRenderer {
     private static String toSvgElement(ViewProduct.Product product,
                                        List<ViewProduct.NodeRef> nodes,
                                        Layout.LayoutFile layout) {
+        Map<String, ViewProduct.NodeRef> byId = new LinkedHashMap<>();
+        for (ViewProduct.NodeRef node : nodes) {
+            byId.put(node.id(), node);
+        }
         double width = 0;
         double height = 0;
         for (Layout.Box box : layout.nodes().values()) {
@@ -315,20 +520,16 @@ public final class SvgRenderer {
             if (source == null || target == null) {
                 continue;
             }
-            double x1 = source.x() + source.width() / 2;
-            double y1 = source.y() + source.height();
-            double x2 = target.x() + target.width() / 2;
-            double y2 = target.y();
-            double midY = (y1 + y2) / 2;
+            Route route = route(source, target);
             svg.append(String.format(Locale.ROOT,
-                    "      <path class=\"edge %s\" data-id=\"%s\" data-source=\"%s\" data-target=\"%s\" d=\"M %.1f %.1f L %.1f %.1f L %.1f %.1f L %.1f %.1f\"/>\n",
+                    "      <path class=\"edge %s\" data-id=\"%s\" data-source=\"%s\" data-target=\"%s\" d=\"%s\"/>\n",
                     escape(relationship.kind()), escape(relationship.id()),
                     escape(relationship.source()), escape(relationship.target()),
-                    x1, y1, x1, midY, x2, midY, x2, y2));
+                    route.path()));
             if (LABELLED_EDGE_KINDS.contains(relationship.kind())) {
                 svg.append(String.format(Locale.ROOT,
                         "      <text class=\"edge-label\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
-                        (x1 + x2) / 2, midY - 4.0, escape("\u00ab" + relationship.kind() + "\u00bb")));
+                        route.labelX(), route.labelY(), escape("\u00ab" + relationship.kind() + "\u00bb")));
             }
         }
         svg.append("    </g>\n");
@@ -354,9 +555,7 @@ public final class SvgRenderer {
                     "        <rect class=\"box\" width=\"%.1f\" height=\"%.1f\" rx=\"4\"/>\n",
                     box.width(), box.height()));
             if (boundary) {
-                svg.append(String.format(Locale.ROOT,
-                        "        <text class=\"port-name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
-                        -6.0, box.height() / 2 + 3.0, escape(label)));
+                svg.append(portLabel(node, box, layout, byId, label));
             } else {
                 svg.append(String.format(Locale.ROOT,
                         "        <text class=\"name\" x=\"%.1f\" y=\"%.1f\">%s</text>\n",
