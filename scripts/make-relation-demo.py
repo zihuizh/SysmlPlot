@@ -67,21 +67,40 @@ def run_java(args: list[str]) -> str:
 
 
 def ensure_data(workspace: str, data_dir: Path, reuse: bool) -> dict:
-    """取索引与追溯矩阵。缺文件时才跑 Java（单次约 10–20 秒，都是小样例）。"""
+    """取索引、追溯矩阵与**视图产物**。缺文件时才跑 Java（单次约 10–20 秒，都是小样例）。
+
+    三条链各有分工，页面里也会把它们分开显示：
+
+      -Index     全模型索引 —— 分析口径（追溯 / 影响范围 / 局部关系 / 矩阵）的底座
+      -Matrix    全模型追溯矩阵
+      -AllViews  每个 ViewUsage 一份产物 —— 视图口径（expose + filter 求值结果）
+    """
     data_dir.mkdir(parents=True, exist_ok=True)
     name = slug(Path(workspace).name)
     index_path = data_dir / ("%s.index.json" % name)
     matrix_path = data_dir / ("%s.matrix.json" % name)
+    views_dir = data_dir / ("%s.views" % name)
 
     if not (reuse and index_path.is_file()):
         run_java(["-Workspace", workspace, "-Index", str(index_path)])
     if not (reuse and matrix_path.is_file()):
         run_java(["-Workspace", workspace, "-Matrix", "-Out", str(matrix_path)])
+    if not (reuse and views_dir.is_dir() and any(views_dir.glob("*.json"))):
+        run_java(["-Workspace", workspace, "-AllViews", str(views_dir)])
 
     index = json.loads(index_path.read_text(encoding="utf-8"))
     matrix = json.loads(matrix_path.read_text(encoding="utf-8")) if matrix_path.is_file() else None
-    return {"index": index, "matrix": matrix, "workspace": workspace,
-            "indexPath": index_path.name, "matrixPath": matrix_path.name}
+    views = []
+    for path in sorted(views_dir.glob("*.json")):
+        product = json.loads(path.read_text(encoding="utf-8"))
+        views.append({"ref": product["view"]["ref"], "name": product["view"].get("name"),
+                      "kind": product["view"].get("kind"), "definition": product["view"].get("definition"),
+                      "rendering": product["view"].get("rendering"),
+                      "expose": product["view"].get("source", {}).get("snippet"),
+                      "file": path.name, "product": product})
+    return {"index": index, "matrix": matrix, "views": views, "workspace": workspace,
+            "indexPath": index_path.name, "matrixPath": matrix_path.name,
+            "viewsDir": views_dir.name}
 
 
 PAGE = """<!doctype html>
@@ -99,6 +118,8 @@ PAGE = """<!doctype html>
            border-bottom:1px solid var(--line); }
   header .title { font-weight:600; }
   header .ws { color:var(--muted); font-size:12px; }
+  header .note { color:#b06000; font-size:11px; background:#fff8e6; border:1px solid #f0dfb8;
+                 border-radius:4px; padding:1px 8px; }
   header .status { margin-left:auto; color:var(--muted); font-size:12px; }
   .toolbar { grid-column:1/4; display:flex; align-items:center; gap:14px; padding:0 14px;
              border-bottom:1px solid var(--line); background:var(--bg); font-size:12px; color:#333; }
@@ -118,19 +139,25 @@ PAGE = """<!doctype html>
   #tree .caret.leaf { visibility:hidden; }
   #tree .name { cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #tree .badge { color:#c0392b; font-size:10px; margin-left:4px; flex:0 0 auto; }
-  #modes { border-top:1px solid var(--line); padding:8px; display:flex; flex-direction:column; gap:4px; }
-  #modes .head { color:var(--muted); font-size:11px; margin-bottom:2px; }
-  #modes button { text-align:left; padding:5px 10px; border:1px solid var(--line); background:#fff;
-                  border-radius:4px; cursor:pointer; font:12px inherit; }
-  #modes button.active { border-color:var(--accent); color:var(--accent); font-weight:600;
-                         background:#f3f8ff; }
+  .picker { border-top:1px solid var(--line); padding:8px; display:flex; flex-direction:column; gap:4px; }
+  .picker .head { color:var(--muted); font-size:11px; margin-bottom:2px; }
+  .picker button { text-align:left; padding:5px 10px; border:1px solid var(--line); background:#fff;
+                   border-radius:4px; cursor:pointer; font:12px inherit; }
+  .picker button.active { border-color:var(--accent); color:var(--accent); font-weight:600;
+                          background:#f3f8ff; }
+  .picker button .sub { color:var(--muted); font-size:11px; font-weight:400; }
   #stage { grid-column:2; grid-row:3/4; position:relative; overflow:hidden; min-height:0; }
   #canvas { position:absolute; inset:0; }
-  #mini { position:absolute; right:12px; bottom:12px; width:400px; height:250px; background:#fff;
-          border:1px solid #cdd6e0; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,.08);
-          overflow:hidden; }
+  #mini { position:absolute; right:12px; bottom:12px; width:400px; height:250px;
+          background:rgba(255,255,255,.94); border:1px solid #cdd6e0; border-radius:6px;
+          box-shadow:0 2px 10px rgba(0,0,0,.08); overflow:hidden; }
+  #mini.collapsed { height:24px; width:230px; }
+  #mini.collapsed #miniCanvas { display:none; }
+  #mini.collapsed .bar .muted, #mini.collapsed .bar .hint { display:none; }
   #mini .bar { height:24px; display:flex; align-items:center; gap:6px; padding:0 8px;
-               border-bottom:1px solid var(--line); background:var(--bg); font-size:11px; color:#444; }
+               border-bottom:1px solid var(--line); background:var(--bg); font-size:11px; color:#444;
+               cursor:move; user-select:none; }
+  #mini .bar .caret { cursor:pointer; color:#666; }
   #mini .bar .muted { color:var(--muted); }
   #miniCanvas { position:absolute; top:24px; left:0; right:0; bottom:0; }
   #panel { grid-column:3; grid-row:3/4; border-left:1px solid var(--line); overflow:auto;
@@ -165,6 +192,7 @@ PAGE = """<!doctype html>
 <header>
   <span class="title">关系与追溯 Demo</span>
   <span class="ws" id="ws"></span>
+  <span class="note" id="scopeNote"></span>
   <span class="status" id="status"></span>
 </header>
 <div class="toolbar">
@@ -179,19 +207,22 @@ PAGE = """<!doctype html>
   <label><input type="checkbox" id="hideAttributes" checked> 隐藏属性</label>
   <label><input type="checkbox" id="hideContainment" checked> 隐藏包含边</label>
   <label><input type="checkbox" id="dim" checked> 淡化无关元素</label>
+  <label><input type="checkbox" id="onlyView"> 只看视图内</label>
   <span style="margin-left:auto"></span>
   <button id="centerBtn">居中选中元素</button>
   <button id="clearBtn">取消选中</button>
 </div>
 <nav id="sidebar">
   <div id="tree"></div>
-  <div id="modes"><div class="head">视图模式</div></div>
+  <div class="picker" id="views"><div class="head">视图（来自 .sysml 的 view 声明）</div></div>
+  <div class="picker" id="modes"><div class="head">分析口径（基于全模型索引）</div></div>
 </nav>
 <div id="stage">
   <div id="canvas"></div>
   <div id="mini">
-    <div class="bar"><b>局部关系图</b><span class="muted" id="miniInfo"></span>
-      <span style="margin-left:auto" class="muted">点小图里的元素可切换中心</span></div>
+    <div class="bar" id="miniBar"><span class="caret" id="miniToggle">▾</span><b>局部关系图</b>
+      <span class="muted" id="miniInfo"></span>
+      <span style="margin-left:auto" class="muted">拖动标题栏可移动 · 点元素可换中心</span></div>
     <div id="miniCanvas"></div>
   </div>
 </div>
@@ -237,15 +268,116 @@ INDEX.relations.forEach(function (relation) {
 });
 
 const state = {
+  scope: 'model',         // 'model' = 全模型（分析口径）；否则是某个视图的 ref
   mode: 'relation',       // relation | trace | impact | matrix
   center: null,
   depth: 2,
   hideAttributes: true,
   hideContainment: true,
   dim: true,
+  onlyView: false,        // 分析结果只看视图内的部分
   edgeKind: 'orth',       // orth | straight | curve
   collapsed: {},          // 树里被折叠的 ref
 };
+
+/** 视图产物（每个 ViewUsage 一份）。没有视图的工作区就是空数组。 */
+const VIEWS = DEMO.views || [];
+
+function currentViewProduct() {
+  if (state.scope === 'model') { return null; }
+  const entry = VIEWS.filter(function (v) { return v.ref === state.scope; })[0];
+  return entry || null;
+}
+
+/** 某个视图产物里出现的元素 ref 集合（用于算"在视图内 / 不在视图内"）。 */
+function viewRefsOf(entry) {
+  const refs = new Set();
+  if (!entry) { return refs; }
+  entry.product.nodes.forEach(function (node) {
+    if (node.ref) { refs.add(node.ref); }
+  });
+  return refs;
+}
+
+/** 视图产物 → 图数据。产物里的节点 id 只在产物内有效，跨口径一律用 ref。 */
+function viewGraphData(entry) {
+  const byId = {};
+  entry.product.nodes.forEach(function (node) { byId[node.id] = node; });
+  const nodes = [];
+  entry.product.nodes.forEach(function (node) {
+    if (!node.ref) { return; }                       // 匿名元素没有跨口径身份，跳过
+    if (state.hideAttributes && categoryOf(node) === 'attribute') { return; }
+    const style = Object.assign({}, NODE_STYLE[categoryOf(node)]);
+    const suffix = node.placement === 'boundary' ? '（边界）' : '';
+    nodes.push({ id: node.ref,
+                 style: Object.assign(style, { label: labelOf(node) + suffix }) });
+  });
+  const ids = new Set(nodes.map(function (node) { return node.id; }));
+  const edges = [];
+  entry.product.relationships.forEach(function (relation, index) {
+    if (state.hideContainment && relation.kind === 'containment') { return; }
+    const source = byId[relation.source];
+    const target = byId[relation.target];
+    if (!source || !target || !source.ref || !target.ref) { return; }
+    if (!ids.has(source.ref) || !ids.has(target.ref)) { return; }
+    const style = edgeStyleOf(relation.kind);
+    edges.push({
+      id: 'v' + index, source: source.ref, target: target.ref, type: edgeTypeOf(),
+      style: Object.assign({ label: style.label, stroke: style.stroke, lineWidth: style.lineWidth },
+                           edgeExtraStyle()),
+      data: { kind: relation.kind },
+    });
+  });
+  return { nodes: nodes, edges: edges };
+}
+
+/**
+ * 视图口径的节点与边 = 视图产物（expose + filter 求值结果）；再按需要把**分析命中但不在
+ * 视图内**的元素补进来（灰虚线），这样"分析是全模型口径"在画布上就能看见，而不只是说一句。
+ */
+function graphData() {
+  const entry = currentViewProduct();
+  if (!entry) { return indexGraphData(); }
+  const data = viewGraphData(entry);
+  const inView = new Set(data.nodes.map(function (node) { return node.id; }));
+  if (state.onlyView) { return data; }
+
+  const gaps = gapRefs();
+  const extras = [];
+  analysisSet().forEach(function (ref) {
+    if (inView.has(ref)) { return; }
+    const element = byRef[ref];
+    if (!element || element.origin === 'library') { return; }
+    if (state.hideAttributes && categoryOf(element) === 'attribute') { return; }
+    extras.push(ref);
+  });
+  extras.forEach(function (ref) {
+    const element = byRef[ref];
+    const style = Object.assign({}, NODE_STYLE[categoryOf(element)], {
+      label: labelOf(element) + (gaps[ref] ? '  (!)' : ''), outside: true, stroke: '#aab4bd',
+    });
+    data.nodes.push({ id: ref, style: style });
+    inView.add(ref);
+  });
+  // 补进来的元素与被命中的已有元素之间的关系也画出来（否则它们成了孤点）
+  const drawn = new Set(data.nodes.map(function (node) { return node.id; }));
+  const existing = new Set(data.edges.map(function (edge) { return edge.source + '> ' + edge.target; }));
+  INDEX.relations.forEach(function (relation, index) {
+    if (state.hideContainment && relation.kind === 'containment') { return; }
+    if (state.mode === 'trace' && !TRACE_KINDS.has(relation.kind)) { return; }
+    if (!drawn.has(relation.source) || !drawn.has(relation.target)) { return; }
+    if (existing.has(relation.source + '> ' + relation.target)) { return; }
+    const style = edgeStyleOf(relation.kind);
+    data.edges.push({
+      id: 'x' + index, source: relation.source, target: relation.target, type: edgeTypeOf(),
+      style: Object.assign({ label: style.label, stroke: style.stroke, lineWidth: style.lineWidth },
+                           edgeExtraStyle()),
+      data: { kind: relation.kind },
+    });
+    existing.add(relation.source + '> ' + relation.target);
+  });
+  return data;
+}
 
 let graph = null;
 let miniGraph = null;
@@ -519,21 +651,39 @@ function visibleElements() {
   });
 }
 
-/** 当前模式下的节点与边集合（不含"选中"带来的淡化，那一步走增量更新）。 */
-function graphData() {
+/**
+ * 当前分析口径要看的元素集合（全模型口径）：
+ * 元素关系 = 中心 + 一跳邻居；追溯 = 追溯边两端；影响范围 = 中心 + 反向可达。
+ * 视图口径下用它算出"哪些命中不在当前视图内"。
+ */
+function analysisSet() {
+  const set = new Set();
+  if (state.mode === 'trace') {
+    INDEX.relations.forEach(function (relation) {
+      if (TRACE_KINDS.has(relation.kind)) { set.add(relation.source); set.add(relation.target); }
+    });
+  }
+  if (!state.center) { return set; }
+  set.add(state.center);
+  if (state.mode === 'relation') {
+    neighbors(state.center).forEach(function (item) { set.add(item.ref); });
+  } else if (state.mode === 'impact') {
+    impact(state.center, state.depth).forEach(function (hit) { set.add(hit.ref); });
+  }
+  return set;
+}
+
+/** 全模型口径的节点与边（不含"选中"带来的淡化，那一步走增量更新）。 */
+function indexGraphData() {
   const gaps = gapRefs();
   const center = state.center;
   let allowedKinds = state.mode === 'trace' ? TRACE_KINDS : null;
   let keep = null;
 
   if (state.mode === 'trace') {
-    keep = new Set();
-    INDEX.relations.forEach(function (relation) {
-      if (TRACE_KINDS.has(relation.kind)) { keep.add(relation.source); keep.add(relation.target); }
-    });
+    keep = analysisSet();
   } else if (state.mode === 'impact' && center) {
-    keep = new Set([center]);
-    impact(center, state.depth).forEach(function (hit) { keep.add(hit.ref); });
+    keep = analysisSet();
   }
 
   let elements = visibleElements();
@@ -592,6 +742,8 @@ function createMainGraph(data, firstRender) {
         fill: function (d) { return d.style.fill; },
         stroke: function (d) { return d.style.stroke; },
         lineWidth: function (d) { return d.style.lineWidth; },
+        // 视图外的元素（分析命中、但不在视图 expose 范围内）走虚线：口径差别要看得见
+        lineDash: function (d) { return d.style.outside ? [6, 4] : []; },
         labelText: function (d) { return d.style.label; },
         labelPlacement: 'bottom', labelFill: '#333', labelFontSize: 11,
       },
@@ -791,6 +943,37 @@ function renderMini() {
 
 // --- 右侧面板 --------------------------------------------------------------------
 
+/**
+ * 把一组 ref 按"是否在当前视图的 expose 范围内"拆开。没选视图时返回 null，
+ * 表示这一层口径差别不适用（全模型口径下没有可比对象）。
+ */
+function splitByView(refs) {
+  const entry = currentViewProduct();
+  if (!entry) { return null; }
+  const inView = viewRefsOf(entry);
+  const inside = [];
+  const outside = [];
+  refs.forEach(function (ref) {
+    if (inView.has(ref)) { inside.push(ref); } else { outside.push(ref); }
+  });
+  return { view: entry.ref, inside: inside, outside: outside };
+}
+
+function viewSplitText(split) {
+  if (!split) { return ''; }
+  return '其中 ' + split.inside.length + ' 个在当前视图内、' + split.outside.length + ' 个不在。';
+}
+
+function outsideListHtml(split) {
+  if (!split || !split.outside.length) { return ''; }
+  const drawn = new Set((view ? view.nodes : []).map(function (node) { return node.id; }));
+  const hidden = split.outside.filter(function (ref) { return !drawn.has(ref); });
+  return '<p class="muted">不在视图内的元素（图上用灰虚线画）：'
+    + split.outside.map(function (ref) { return linkHtml(ref); }).join('、')
+    + (hidden.length ? ('（其中 ' + hidden.length + ' 个被当前筛选挡掉了）') : '')
+    + '</p>';
+}
+
 /** 面板里的元素链接统一走委托：点谁就选中谁（矩阵模式会顺带切回关系视图）。 */
 function bindLinks(scope) {
   Array.from(scope.querySelectorAll('a.elink')).forEach(function (link) {
@@ -868,8 +1051,10 @@ function panelTrace() {
 
 function panelImpact() {
   const hits = impact(state.center, state.depth);
+  const split = splitByView(hits.map(function (hit) { return hit.ref; }));
   let html = '<h4>影响范围</h4><p class="muted">沿反向边可达（不含包含关系）：改动本元素会牵连 '
-    + hits.length + ' 个元素。</p><table>'
+    + hits.length + ' 个元素。' + viewSplitText(split) + '</p>'
+    + outsideListHtml(split) + '<table>'
     + '<tr><th>步数</th><th>经由</th><th>元素</th><th>位置</th></tr>';
   hits.forEach(function (hit) {
     const element = byRef[hit.ref] || {};
@@ -934,7 +1119,7 @@ const MODES = [
 
 function renderModes() {
   const box = document.getElementById('modes');
-  box.innerHTML = '<div class="head">视图模式</div>';
+  box.innerHTML = '<div class="head">分析口径（基于全模型索引）</div>';
   MODES.forEach(function (mode) {
     const button = document.createElement('button');
     button.textContent = mode.label;
@@ -942,6 +1127,44 @@ function renderModes() {
     button.onclick = function () { run('mode', mode.id); };
     box.appendChild(button);
   });
+}
+
+/** 视图列表：来自 .sysml 的 view 声明（`-AllViews` 产物），外加一个显式的"全模型"入口。 */
+function renderScopes() {
+  const box = document.getElementById('views');
+  box.innerHTML = '<div class="head">视图（来自 .sysml 的 view 声明）</div>';
+  function button(id, label, sub) {
+    const el = document.createElement('button');
+    el.innerHTML = escapeHtml(label) + (sub ? (' <span class="sub">' + escapeHtml(sub) + '</span>') : '');
+    el.className = state.scope === id ? 'active' : '';
+    el.onclick = function () { run('scope', id); };
+    box.appendChild(el);
+  }
+  button('model', '全模型（分析口径）',
+         INDEX.elements.length + ' 元素 / ' + INDEX.relations.length + ' 关系');
+  VIEWS.forEach(function (entry) {
+    const nodes = entry.product.nodes.length;
+    const edges = entry.product.relationships.length;
+    button(entry.ref, entry.name || entry.ref,
+           (entry.kind || '?') + ' · expose ' + nodes + ' 节点 / ' + edges + ' 边');
+  });
+}
+
+/** 页头常驻的口径说明：视图是子集、分析是全模型，这两句话要在界面上有。 */
+function paintScopeNote() {
+  const note = document.getElementById('scopeNote');
+  const entry = currentViewProduct();
+  if (!entry) {
+    note.textContent = '口径：全模型索引 · 分析不受视图 expose 限制';
+    return;
+  }
+  const refs = viewRefsOf(entry);
+  const set = analysisSet();
+  const outside = Array.from(set).filter(function (ref) { return !refs.has(ref); });
+  note.textContent = '口径：视图「' + (entry.name || entry.ref) + '」= expose 求值 '
+    + entry.product.nodes.length + ' 节点 / ' + entry.product.relationships.length
+    + ' 边；当前分析基于全模型索引，命中 ' + set.size + ' 个（含中心），其中 '
+    + (set.size - outside.length) + ' 个在视图内、' + outside.length + ' 个不在';
 }
 
 /** 矩阵模式用表格替掉图区；局部关系图也跟着收起（它是图区的附属）。 */
@@ -954,34 +1177,53 @@ function layoutForMode() {
 
 function paintStatus() {
   const element = state.center ? (byRef[state.center] || {}) : null;
+  const entry = currentViewProduct();
   document.getElementById('counts').textContent = (view && state.mode !== 'matrix')
-    ? ('节点 ' + view.nodes.length + ' · 边 ' + view.edges.length
+    ? ((entry ? '视图内 ' : '口径 全模型 ') + '节点 ' + view.nodes.length + ' · 边 ' + view.edges.length
        + (state.center ? (' · 中心 ' + labelOf(element)) : ' · 未选中'))
     : ('模型 ' + INDEX.elements.length + ' 元素 / ' + INDEX.relations.length + ' 关系');
   document.getElementById('timings').textContent =
     timings.renderMs === undefined ? '' : ('渲染 ' + Math.round(timings.renderMs) + 'ms');
   document.getElementById('status').textContent = problems.length
-    ? ('问题：' + problems[0]) : ('G6 ' + G6.version + ' · 索引由 Java 侧产出');
+    ? ('问题：' + problems[0])
+    : ('G6 ' + G6.version + ' · 索引/矩阵/视图产物均由 Java 侧产出');
 }
 
 function snapshot() {
   const sub = state.center ? subgraph(state.center, state.depth) : { nodes: [], edges: [] };
   const hits = state.center ? impact(state.center, state.depth) : [];
   const list = state.center ? neighbors(state.center) : [];
+  const entry = currentViewProduct();
+  const analysis = Array.from(analysisSet());
+  const split = splitByView(analysis);
+  const drawnRefs = new Set((view ? view.nodes : []).map(function (node) { return node.id; }));
+  const outsideDrawn = split ? split.outside.filter(function (ref) { return drawnRefs.has(ref); }) : [];
+  const outsideHidden = split ? split.outside.filter(function (ref) { return !drawnRefs.has(ref); }) : [];
   const byDepth = {};
   hits.forEach(function (hit) { byDepth[hit.depth] = (byDepth[hit.depth] || 0) + 1; });
   return {
+    scope: state.scope,
+    viewRef: entry ? entry.ref : null,
     mode: state.mode,
     center: state.center,
     depth: state.depth,
     edgeKind: state.edgeKind,
     filters: { hideAttributes: state.hideAttributes, hideContainment: state.hideContainment,
-               dim: state.dim },
+               dim: state.dim, onlyView: state.onlyView },
     counts: {
+      viewsAvailable: VIEWS.length,
+      viewNodes: entry ? entry.product.nodes.length : 0,
+      viewEdges: entry ? entry.product.relationships.length : 0,
       modelElements: INDEX.elements.length,
       modelRelations: INDEX.relations.length,
       drawnNodes: view ? view.nodes.length : 0,
       drawnEdges: view ? view.edges.length : 0,
+      analysisHits: analysis.length,
+      hitsInView: split ? split.inside.length : null,
+      hitsOutsideView: split ? split.outside.length : null,
+      hitsOutsideDrawn: split ? outsideDrawn.length : null,
+      hitsOutsideHiddenByFilter: split ? outsideHidden.length : null,
+      outsideRefs: split ? split.outside : [],
       neighbors: list.length,
       subgraphNodes: sub.nodes.length,
       subgraphEdges: sub.edges.length,
@@ -1027,12 +1269,19 @@ function refresh(rebuild) {
   }).then(function () {
     renderPanel();
     renderTree();
+    renderScopes();
+    paintScopeNote();
     paintStatus();
     document.getElementById('metrics').textContent = JSON.stringify(snapshot());
   });
 }
 
 function execute(name, arg) {
+  if (name === 'scope') {
+    state.scope = arg;
+    // 视图口径换的是整张图的节点集合（视图产物 vs 全模型索引），必须重建
+    return refresh(true);
+  }
   if (name === 'center') {
     state.center = arg;
     // 影响范围模式的节点集合依赖中心，必须重建；关系/追溯只是改高亮
@@ -1072,6 +1321,11 @@ function execute(name, arg) {
     syncControls();
     return refresh(true);
   }
+  if (name === 'onlyView') {
+    state.onlyView = !!arg;
+    syncControls();
+    return refresh(true);
+  }
   if (name === 'collapseAll') { setTreeCollapsed(true); renderTree(); return Promise.resolve(); }
   if (name === 'expandAll') { setTreeCollapsed(false); renderTree(); return Promise.resolve(); }
   if (name === 'row') {
@@ -1106,6 +1360,8 @@ function syncControls() {
   document.getElementById('hideAttributes').checked = state.hideAttributes;
   document.getElementById('hideContainment').checked = state.hideContainment;
   document.getElementById('dim').checked = state.dim;
+  document.getElementById('onlyView').checked = state.onlyView;
+  document.getElementById('onlyView').disabled = state.scope === 'model';
 }
 
 function bindControls() {
@@ -1120,8 +1376,39 @@ function bindControls() {
   document.getElementById('dim').onchange = function (event) {
     run('filter', { dim: event.target.checked });
   };
+  document.getElementById('onlyView').onchange = function (event) {
+    run('onlyView', event.target.checked);
+  };
   document.getElementById('centerBtn').onclick = function () { run('centerView'); };
   document.getElementById('clearBtn').onclick = function () { run('clear'); };
+  // 右下角小图：标题栏点箭头折叠、按住可拖动（它是画布上的浮层，会盖住底下的元素）
+  const mini = document.getElementById('mini');
+  document.getElementById('miniToggle').onclick = function (event) {
+    event.stopPropagation();
+    mini.classList.toggle('collapsed');
+    document.getElementById('miniToggle').textContent =
+      mini.classList.contains('collapsed') ? '\u25B8' : '\u25BE';
+    if (!mini.classList.contains('collapsed')) { renderMini(); }
+  };
+  const bar = document.getElementById('miniBar');
+  let dragging = null;
+  bar.addEventListener('mousedown', function (event) {
+    if (event.target.id === 'miniToggle') { return; }
+    const stage = document.getElementById('stage').getBoundingClientRect();
+    const box = mini.getBoundingClientRect();
+    dragging = { dx: event.clientX - box.left, dy: event.clientY - box.top, stage: stage };
+    event.preventDefault();
+  });
+  document.addEventListener('mousemove', function (event) {
+    if (!dragging) { return; }
+    const left = Math.max(4, Math.min(dragging.stage.width - 60, event.clientX - dragging.dx - dragging.stage.left));
+    const top = Math.max(4, Math.min(dragging.stage.height - 30, event.clientY - dragging.dy - dragging.stage.top));
+    mini.style.left = left + 'px';
+    mini.style.top = top + 'px';
+    mini.style.right = 'auto';
+    mini.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', function () { dragging = null; });
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') { run('clear'); }
   });
@@ -1141,9 +1428,12 @@ function boot() {
   });
   const fallback = INDEX.elements.filter(function (element) { return element.metaclass !== 'Package'; });
   state.center = ((authored[0] || anyRequirement[0] || fallback[0] || {}).ref) || null;
+  // 默认口径：有视图就先落在第一个视图上（让"视图 = 子集"第一眼就能看见），否则全模型
+  state.scope = VIEWS.length ? VIEWS[0].ref : 'model';
   syncControls();
   bindControls();
   renderModes();
+  renderScopes();
   layoutForMode();
   const ready = refresh(true);
   window.__PROTO = { ready: ready, run: run, report: snapshot, state: state };
@@ -1175,9 +1465,9 @@ def main() -> int:
             .replace("__JS__", JS))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(html, encoding="utf-8")
-    print("[demo] %s -> %s (%.1f KB；索引 %d 元素 / %d 关系)"
+    print("[demo] %s -> %s (%.1f KB；索引 %d 元素 / %d 关系；视图 %d 个)"
           % (args.workspace, args.out, args.out.stat().st_size / 1024,
-             len(data["index"]["elements"]), len(data["index"]["relations"])))
+             len(data["index"]["elements"]), len(data["index"]["relations"]), len(data["views"])))
     return 0
 
 
