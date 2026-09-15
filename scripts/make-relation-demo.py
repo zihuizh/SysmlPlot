@@ -211,6 +211,7 @@ PAGE = """<!doctype html>
   <span style="margin-left:auto"></span>
   <button id="centerBtn">居中选中元素</button>
   <button id="clearBtn">取消选中</button>
+  <button id="csvBtn">导出矩阵 CSV</button>
 </div>
 <nav id="sidebar">
   <div id="tree"></div>
@@ -344,7 +345,9 @@ function graphData() {
 
   const gaps = gapRefs();
   const extras = [];
-  analysisSet().forEach(function (ref) {
+  const wanted = analysisSet();
+  if (state.center) { wanted.add(state.center); }   // 跨视图跳转时，中心即使不在视图里也要留着
+  wanted.forEach(function (ref) {
     if (inView.has(ref)) { return; }
     const element = byRef[ref];
     if (!element || element.origin === 'library') { return; }
@@ -749,7 +752,10 @@ function createMainGraph(data, firstRender) {
       },
       state: {
         center: { stroke: '#1a73e8', lineWidth: 3 },
-        impact: { fill: '#fff4e5', stroke: '#d68910', lineWidth: 2 },
+        // 影响范围按步数分色：越远越浅
+        impact1: { fill: '#ffe9c7', stroke: '#d68910', lineWidth: 2.2 },
+        impact2: { fill: '#fff4e5', stroke: '#e0a94f', lineWidth: 1.8 },
+        impact3: { fill: '#fffaf0', stroke: '#e6c79a', lineWidth: 1.5 },
         dim: { opacity: 0.16 },
       },
     },
@@ -814,7 +820,9 @@ function applyHighlight() {
     (incoming[state.center] || []).forEach(function (relation) { related.add(relation.source); });
   }
   if (state.mode === 'impact' && state.center) {
-    impact(state.center, state.depth).forEach(function (hit) { states[hit.ref] = ['impact']; });
+    impact(state.center, state.depth).forEach(function (hit) {
+      states[hit.ref] = ['impact' + Math.min(3, hit.depth)];
+    });
   }
   const data = graph.getData();
   data.nodes.forEach(function (node) {
@@ -974,11 +982,22 @@ function outsideListHtml(split) {
     + '</p>';
 }
 
+/**
+ * "出现在哪些视图"里的视图名：已导出产物的做成可点链接（点了就切到那个视图口径），
+ * 没有产物的（比如视图定义本身、或产物导出失败）退化成纯文本，不假装能跳。
+ */
+function viewLinkHtml(viewRef) {
+  const known = VIEWS.some(function (entry) { return entry.ref === viewRef; });
+  if (!known) { return escapeHtml(viewRef) + ' <span class="muted">(无产物)</span>'; }
+  return '<a class="elink" data-scope="' + escapeHtml(viewRef) + '">' + escapeHtml(viewRef) + '</a>';
+}
+
 /** 面板里的元素链接统一走委托：点谁就选中谁（矩阵模式会顺带切回关系视图）。 */
 function bindLinks(scope) {
   Array.from(scope.querySelectorAll('a.elink')).forEach(function (link) {
     link.onclick = function (event) {
       event.stopPropagation();
+      if (link.dataset.scope) { run('scope', link.dataset.scope); return; }
       run('link', link.dataset.ref);
     };
   });
@@ -1001,7 +1020,7 @@ function renderPanel() {
     + '</td></tr>'
     + '<tr><td class="muted">出现在</td><td>'
     + ((element.views && element.views.length)
-        ? element.views.map(function (view) { return escapeHtml(view); }).join('<br>')
+        ? element.views.map(function (viewRef) { return viewLinkHtml(viewRef); }).join('<br>')
         : '<span class="muted">—</span>')
     + '</td></tr></table>';
 
@@ -1054,6 +1073,7 @@ function panelImpact() {
   const split = splitByView(hits.map(function (hit) { return hit.ref; }));
   let html = '<h4>影响范围</h4><p class="muted">沿反向边可达（不含包含关系）：改动本元素会牵连 '
     + hits.length + ' 个元素。' + viewSplitText(split) + '</p>'
+    + impactLegend(hits)
     + outsideListHtml(split) + '<table>'
     + '<tr><th>步数</th><th>经由</th><th>元素</th><th>位置</th></tr>';
   hits.forEach(function (hit) {
@@ -1066,7 +1086,54 @@ function panelImpact() {
   return html + '</table>';
 }
 
+/** 影响范围的步数图例：与节点状态的配色一一对应。 */
+function impactLegend(hits) {
+  const depths = {};
+  hits.forEach(function (hit) { depths[hit.depth] = (depths[hit.depth] || 0) + 1; });
+  const colors = { 1: '#ffe9c7', 2: '#fff4e5', 3: '#fffaf0' };
+  const keys = Object.keys(depths).map(Number).sort(function (a, b) { return a - b; });
+  if (!keys.length) { return ''; }
+  return '<p class="muted">步数：' + keys.map(function (depth) {
+    const key = Math.min(3, depth);
+    return '<span style="display:inline-block;width:10px;height:10px;background:' + colors[key]
+      + ';border:1px solid #d68910;vertical-align:middle;margin:0 3px 0 6px"></span>'
+      + depth + ' 跳（' + depths[depth] + '）';
+  }).join('') + '</p>';
+}
+
 // --- 追溯矩阵 --------------------------------------------------------------------
+
+/** 矩阵导出 CSV：全模型口径，列与界面一致；带 BOM 以便 Excel 直接识别中文。 */
+function matrixCsv() {
+  if (!MATRIX) { return ''; }
+  function cell(text) {
+    const value = literalText(text).replace(/"/g, '""');
+    return '"' + value + '"';
+  }
+  const lines = ['\uFEFF需求编号,需求,满足方,验证方,派生自,派生出,文件,行,缺口'];
+  MATRIX.rows.forEach(function (row) {
+    const gap = !row.satisfiedBy.length && !row.verifiedBy.length;
+    lines.push([cell(row.reqId), cell(row.name || shortName(row.ref)),
+                cell(row.satisfiedBy.map(shortName).join(' ')), cell(row.verifiedBy.map(shortName).join(' ')),
+                cell(row.derivedFrom.map(shortName).join(' ')), cell(row.derivedBy.map(shortName).join(' ')),
+                cell(row.file), cell(row.line), cell(gap ? '是' : '')].join(','));
+  });
+  return lines.join('\r\n');
+}
+
+function downloadMatrixCsv() {
+  const text = matrixCsv();
+  if (!text) { problems.push('没有矩阵数据可导出'); return; }
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = (DEMO.workspace.split('/').pop() || 'trace') + '-trace-matrix.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+}
 
 function renderMatrix() {
   const box = document.getElementById('matrix');
@@ -1233,6 +1300,11 @@ function snapshot() {
     },
     matrix: MATRIX ? { requirements: MATRIX.requirements, satisfied: MATRIX.satisfied,
                        verified: MATRIX.verified, gaps: MATRIX.gaps } : null,
+    matrixCsv: (function () {
+      const text = matrixCsv();
+      if (!text) { return null; }
+      return { rows: MATRIX.rows.length, bytes: text.length, firstDataLine: text.split('\r\n')[1] || '' };
+    })(),
     // 视口单列出来：用来证明"选中不动视口、只有显式居中才动"
     viewport: graph ? { zoom: Math.round(graph.getZoom() * 1000) / 1000,
                         position: graph.getPosition().map(function (v) { return Math.round(v); }) } : null,
@@ -1381,6 +1453,7 @@ function bindControls() {
   };
   document.getElementById('centerBtn').onclick = function () { run('centerView'); };
   document.getElementById('clearBtn').onclick = function () { run('clear'); };
+  document.getElementById('csvBtn').onclick = function () { downloadMatrixCsv(); };
   // 右下角小图：标题栏点箭头折叠、按住可拖动（它是画布上的浮层，会盖住底下的元素）
   const mini = document.getElementById('mini');
   document.getElementById('miniToggle').onclick = function (event) {
@@ -1436,7 +1509,7 @@ function boot() {
   renderScopes();
   layoutForMode();
   const ready = refresh(true);
-  window.__PROTO = { ready: ready, run: run, report: snapshot, state: state };
+  window.__PROTO = { ready: ready, run: run, report: snapshot, state: state, matrixCsv: matrixCsv };
 }
 
 boot();

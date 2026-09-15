@@ -58,7 +58,8 @@ Java 侧导出三条链
 ![视图口径下的追溯关系](images/relation-demo/04-view-trace.png)
 
 **影响范围**：沿反向边可达（不含包含关系），右面板给出步数 / 经由 / 元素 / 位置，
-并直接写明"其中 K 个在当前视图内、M 个不在"，视图外的成员在画布上是灰虚线：
+节点**按步数分色**（1 跳最深、越远越浅，面板里有图例），并直接写明"其中 K 个在当前视图内、
+M 个不在"，视图外的成员在画布上是灰虚线：
 
 ![视图口径下的影响范围](images/relation-demo/02-view-impact.png)
 
@@ -66,10 +67,21 @@ Java 侧导出三条链
 
 ![全模型口径下的影响范围](images/relation-demo/03-model-impact.png)
 
+多跳的例子（中心是需求定义 `MassLimit`，1 跳 2 个、2 跳 4 个，图上深浅分明）：
+
+![影响范围按步数分色](images/relation-demo/09-impact-depths.png)
+
 ## 4. 需求追溯矩阵
 
 矩阵本来就是全模型口径（`--matrix`），顶部四块统计：需求 / 已满足 / 已验证 / 缺口；
 表格里**每个元素都是链接**，点满足方就跳到满足方，点需求行才跳到需求。
+工具栏的"导出矩阵 CSV"把同一份数据导成带 BOM 的 CSV（Excel 直接打开，中文不乱码），
+方便进评审材料：
+
+```
+需求编号,需求,满足方,验证方,派生自,派生出,文件,行,缺口
+"1.1","massLimitReq","vehicleDesign","MassTest massTest","","chassisMassReq","RequirementsModel.sysml","14",""
+```
 
 ![需求追溯矩阵](images/relation-demo/05-matrix.png)
 
@@ -109,6 +121,9 @@ Java 侧导出三条链
 | 选中后自动居中、视图跳得厉害 | 选中只改高亮不动视口；居中要在树上再点一次、双击节点或点"居中选中元素" |
 | 线型只有直线 | 默认直角折线（G6 polyline + `router:orth`），可切直线 / 圆滑曲线 |
 | 右下角白底挡住元素 | 小图可折叠、可拖动、半透明 |
+| 跨视图跳转 | 元素详情里的"出现在"是**可点的视图链接**：点了就切到那个视图口径，中心保持选中 |
+| 影响范围看不出远近 | 按步数分色（1 跳最深、越远越浅）+ 面板图例与逐行步数 |
+| 矩阵要能带走 | 工具栏"导出矩阵 CSV"（带 BOM，Excel 直接打开） |
 
 ## 7. 可核验的证据
 
@@ -148,6 +163,14 @@ Java 侧导出三条链
 | 选中 `massLimitReq` | 0.616 | [16, 288] |
 | 再选中 `vehicleDesign` | 0.616 | [16, 288] ← 没动 |
 | 显式居中 `vehicleDesign` | 0.616 | [176, 374] ← 只有这一步动 |
+
+**五、新增三项的页内数字**：
+
+| 项 | 页内读数 |
+|---|---|
+| 影响范围按步数分色 | 中心 `MassLimit`：1 跳 2 个、2 跳 4 个（`impactByDepth={'1':2,'2':4}`） |
+| 矩阵 CSV | 2 行数据 / 227 字节，首行 `"1.1","massLimitReq","vehicleDesign","MassTest massTest","","chassisMassReq","RequirementsModel.sysml","14",""` |
+| 跨视图跳转 | 详情里"出现在 `RequirementsViews::'requirement trace'`"可点，点击后口径切到该视图且中心不丢 |
 
 ## 8. 追溯关系、影响范围、局部关系：同一底座上的三种遍历
 
@@ -205,8 +228,6 @@ python scripts\measure-proto.py --html build\demo\requirements.html `
 
 | 项 | 说明 |
 |---|---|
-| 跨视图跳转 | 索引已带 `views[]`，面板上可直接给出"出现在哪些视图"并跳过去 |
-| 导出 | 矩阵导出 CSV/Markdown；画布导出 PNG/SVG（G6 有 `toDataURL`，SVG 出口待验） |
+| 画布导出 | 矩阵已能导 CSV；画布导出 PNG/SVG 待做（G6 有 `toDataURL`，SVG 出口未验） |
 | 局部关系图接 `--local-view` | 现在页内自己算；接上 Java 产物后可复用同一份导出 |
-| 影响范围分层着色 | 目前命中元素同色，按步数分色更直观 |
 | 大图策略 | 先筛后画（按包/需求号），再走"关系 → 局部图"的路径 |
