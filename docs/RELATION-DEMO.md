@@ -83,6 +83,10 @@ M 个不在"，视图外的成员在画布上是灰虚线：
 "1.1","massLimitReq","vehicleDesign","MassTest massTest","","chassisMassReq","RequirementsModel.sysml","14",""
 ```
 
+工具栏的"导出画布 PNG"走 G6 自己的 `toDataURL`（整图，不限于当前视口），文件名带上
+工作区 / 视图 / 分析口径（例如 `requirements-requirement%20trace-impact.png`），
+从文件名就能看出这张图是什么口径。
+
 ![需求追溯矩阵](images/relation-demo/05-matrix.png)
 
 `samples/requirements`：需求 2、已满足 1、已验证 1、**缺口 1**（`[1.2] chassisMassReq` 由 `[1.1]`
@@ -124,6 +128,7 @@ M 个不在"，视图外的成员在画布上是灰虚线：
 | 跨视图跳转 | 元素详情里的"出现在"是**可点的视图链接**：点了就切到那个视图口径，中心保持选中 |
 | 影响范围看不出远近 | 按步数分色（1 跳最深、越远越浅）+ 面板图例与逐行步数 |
 | 矩阵要能带走 | 工具栏"导出矩阵 CSV"（带 BOM，Excel 直接打开） |
+| 画布要能带走 | 工具栏"导出画布 PNG"（G6 `toDataURL`，文件名带工作区/视图/口径） |
 
 ## 7. 可核验的证据
 
@@ -170,6 +175,7 @@ M 个不在"，视图外的成员在画布上是灰虚线：
 |---|---|
 | 影响范围按步数分色 | 中心 `MassLimit`：1 跳 2 个、2 跳 4 个（`impactByDepth={'1':2,'2':4}`） |
 | 矩阵 CSV | 2 行数据 / 227 字节，首行 `"1.1","massLimitReq","vehicleDesign","MassTest massTest","","chassisMassReq","RequirementsModel.sysml","14",""` |
+| 画布 PNG | `toDataURL` 返回的数据 URL 约 42 KB（页内读数），无报错 |
 | 跨视图跳转 | 详情里"出现在 `RequirementsViews::'requirement trace'`"可点，点击后口径切到该视图且中心不丢 |
 
 ## 8. 追溯关系、影响范围、局部关系：同一底座上的三种遍历
@@ -228,6 +234,6 @@ python scripts\measure-proto.py --html build\demo\requirements.html `
 
 | 项 | 说明 |
 |---|---|
-| 画布导出 | 矩阵已能导 CSV；画布导出 PNG/SVG 待做（G6 有 `toDataURL`，SVG 出口未验） |
+| SVG 导出 | 画布已能导 PNG（`toDataURL`）；SVG 需要 `@antv/g-svg` 渲染器，当前 bundle 里没有，未做 |
 | 局部关系图接 `--local-view` | 现在页内自己算；接上 Java 产物后可复用同一份导出 |
 | 大图策略 | 先筛后画（按包/需求号），再走"关系 → 局部图"的路径 |

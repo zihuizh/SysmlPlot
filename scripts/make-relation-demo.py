@@ -211,6 +211,7 @@ PAGE = """<!doctype html>
   <span style="margin-left:auto"></span>
   <button id="centerBtn">居中选中元素</button>
   <button id="clearBtn">取消选中</button>
+  <button id="pngBtn">导出画布 PNG</button>
   <button id="csvBtn">导出矩阵 CSV</button>
 </div>
 <nav id="sidebar">
@@ -1135,6 +1136,31 @@ function downloadMatrixCsv() {
   setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
 }
 
+/**
+ * 画布导出 PNG：用 G6 自己的 toDataURL（整图，不限于当前视口），文件名带口径与视图名，
+ * 这样从文档里看到一张图就知道它是"哪份工作区、哪个视图、哪个分析口径"。
+ */
+function downloadCanvasPng() {
+  if (!graph) { return Promise.resolve(); }
+  const entry = currentViewProduct();
+  const parts = [DEMO.workspace.split('/').pop() || 'workspace', entry ? (entry.name || 'view') : 'model',
+                 state.mode];
+  const name = parts.join('-').replace(/[^A-Za-z0-9\u4e00-\u9fa5._-]+/g, '-') + '.png';
+  return Promise.resolve(graph.toDataURL()).then(function (url) {
+    if (!url) { problems.push('导出 PNG 失败：toDataURL 返回空'); return; }
+    timings.lastPngKb = Math.round(url.length / 1024);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    paintStatus();
+  }).catch(function (error) {
+    problems.push('导出 PNG 失败: ' + error.message);
+  });
+}
+
 function renderMatrix() {
   const box = document.getElementById('matrix');
   if (!MATRIX) { box.innerHTML = '<p class="muted">这个工作区没有矩阵数据。</p>'; return; }
@@ -1454,6 +1480,7 @@ function bindControls() {
   document.getElementById('centerBtn').onclick = function () { run('centerView'); };
   document.getElementById('clearBtn').onclick = function () { run('clear'); };
   document.getElementById('csvBtn').onclick = function () { downloadMatrixCsv(); };
+  document.getElementById('pngBtn').onclick = function () { downloadCanvasPng(); };
   // 右下角小图：标题栏点箭头折叠、按住可拖动（它是画布上的浮层，会盖住底下的元素）
   const mini = document.getElementById('mini');
   document.getElementById('miniToggle').onclick = function (event) {
@@ -1510,6 +1537,7 @@ function boot() {
   layoutForMode();
   const ready = refresh(true);
   window.__PROTO = { ready: ready, run: run, report: snapshot, state: state, matrixCsv: matrixCsv };
+  window.__PROTO.exportPng = downloadCanvasPng;
 }
 
 boot();
