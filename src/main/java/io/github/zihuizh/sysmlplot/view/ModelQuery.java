@@ -15,7 +15,7 @@ import java.util.Set;
 /**
  * 模型查询层：索引之上的遍历。
  *
- * <p>阶段 3 的四个消费者共用它，而不是各写一套遍历（见 `docs/PHASE-3-PLAN.md` §3.2）：
+ * <p>阶段 3 的四个消费者共用它，而不是各写一套遍历（见 `docs/archive/PHASE-3-PLAN.md` §3.2）：
  *
  * <table>
  *   <tr><td>关系列表（1 跳）</td><td>{@link #neighbors}</td></tr>

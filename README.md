@@ -11,13 +11,14 @@ SysML v2 视图生成与查看工具。以 SysML v2 文本为事实源，按标�
 | `SYSML-VIEW-TOOL-FEASIBILITY.md` | 可行性评估：难度分解、工期、参考仓库取舍、风险 |
 | `docs/DEVELOPMENT.md` | **开发规范**：分支与提交、目录命名、代码与文档约定、验证要求、提交前检查 |
 | `docs/ROADMAP.md` | 阶段划分与各阶段验收标准 |
-| `docs/PHASE-1-PLAN.md` | 阶段 1 技术方案：解析器接入、视图求值、产物契约 |
-| `docs/PHASE-3-PLAN.md` | 阶段 3 计划：模型查询、追溯矩阵、验收（T0–T4）与性能基线 |
 | `docs/VIEW-PRODUCT.md` | **视图产物契约**：字段、词表、暴露范围、排序与渲染器契约 |
+| `docs/GRAPH-LIB-P0.md` | 图库框架 P0：G6 与 Cytoscape 原型和实测结果 |
+| `docs/GRAPH-LIB-P1.md` | 图库框架 P1：原生布局、交互与动画的实测与选型结论 |
 | `docs/ORACLE-DIFF.md` | 与官方渲染、SysON 的差分验证结论（含已知差异的原因） |
 | `docs/PERF-BASELINE.md` | 性能基线：分档耗时与瓶颈定位 |
 | `docs/BACKLOG.md` | 已知但尚未做的事情 |
 | `docs/ENVIRONMENT.md` | 本机已验证的环境事实与依赖位置 |
+| `docs/archive/` | 已完成阶段的计划、验收记录与历史结论 |
 
 ## 远程仓库
 
@@ -58,25 +59,25 @@ python scripts\diff-syson.py --list-projects          # 与 SysON 做差分（�
 ```
 
 可加 `-Puml "<view 限定名>"` 输出 PlantUML，或用 `-Svg "<view 限定名>" -Out build\view.svg`
-导出 SVG。当前结论见 `docs/PHASE-1-FINDINGS.md`。
+导出 SVG。历史验证结论见 `docs/archive/PHASE-1-FINDINGS.md`。
 
 视图产物的契约见 `docs/VIEW-PRODUCT.md`，机器可读 schema 见
 `schema/view-product.schema.json`（可用 `python -m jsonschema` 校验产物）。
 
-渲染走同一个命令：`-Svg` 出图，`-EmitLayout` 落盘布局，`-Layout` 用既有布局重放
-（产物与布局一致时，重放结果与首次渲染逐字节相同）。
-`-Html` 输出自包含的交互式页面（平移、缩放、点选节点看属性、按来源过滤），可离线打开。
+现有 Java 渲染器继续作为稳定的导出与回归基线：`-Svg` 出图，`-EmitLayout` 落盘布局，
+`-Layout` 用既有布局重放；`-Html` 输出自包含交互页。
 `scripts\render-png.ps1` 导出 PNG（先出 SVG，再用无头浏览器光栅化，`-Scale` 可放大，
 需要本机有 Chrome 或 Edge）。
 
 ## 当前状态
 
-阶段 0（评估）、阶段 1（解析与视图生成）、阶段 2（可用 MVP）、阶段 3（**模型查询与追溯**）
-都已完成并合并进 `main`：全模型索引、关系导航、跨视图跳转、局部关系视图、影响范围分析、
-需求追溯矩阵与覆盖率门禁，外加 T0–T4 五层验收记录。
+阶段 0–3 已完成：解析、视图产物、基础展示、模型查询和追溯均有可运行实现与回归验证。
+已完成阶段的计划和验收记录已移入 `docs/archive/`。
 
-下一步是阶段 4（双向编辑），尚未开始；阶段 3 的支撑项（布局按视图类型分化、增量产物、
-行为视图专有规则等）记在 `docs/BACKLOG.md`。
+当前重点是**展示层升级**。项目已确定采用图库框架承接视图产物之后的布局、交互和动画，
+并已选定 **G6 5.1.1** 作为展示层框架（Cytoscape 保留为体积敏感的备选）。现有自研布局和
+渲染器保留为基线与兼容出口，不再作为主要演进方向。P1 原型与实测数据见
+`docs/GRAPH-LIB-P1.md`；当前工作和选择标准见 `docs/ROADMAP.md` 与 `docs/BACKLOG.md`。
 
 ## 关键约束
 

@@ -1,88 +1,46 @@
 # 待办与已知缺口
 
-记录当前**已知但尚未做**的事情，避免依赖记忆。每项做完后从本文件移除，结论进对应文档
-（契约进 `docs/VIEW-PRODUCT.md`，实测事实进 `docs/PHASE-1-FINDINGS.md`）。
+这里只记录尚未完成的事情。已完成内容和历史验收记录见 `docs/archive/`。
 
 更新日期：2026-09-14
 
-## 阶段 1 剩余项（按依赖顺序）
-
-### 1. 关系边补全 ✅（已完成）
-
-`containment` / `typing` / `specialization` / `subsetting` / `redefinition` 五类已实现，
-来源见 `docs/VIEW-PRODUCT.md` 第 3 节。验证样例：`samples/structure`。
-后续补齐（阶段 2、阶段 3）：`satisfy`、`allocate`、`flow`、`connection`、`verify`、
-`derive`、`perform`、`succession` 全部完成，来源与对照情况见 `docs/VIEW-PRODUCT.md` 第 3 节
-与 `docs/ORACLE-DIFF.md`。**语义边这一项可以关掉了**。
-
-### 2. 按视图类型分投影（部分完成）
-
-- ✅ **Interconnection**：连接器变边、端口贴节点边界（`view.kind` + `placement` + `connection` /
-  `flow` / `allocate` / `succession` / `binding`）
-- 🟡 **Action Flow**：动作是节点、`succession` 与 `flow` 是边（已完成，样例 `samples/actions`）；
-  控制节点（fork/join/decision/merge）、守卫与 trigger 仍未做
-- ❌ **State Transition**：状态节点 + 带 trigger/guard/effect 的迁移边
-
-注：Action Flow 与 State Transition 在标准库里特化自 InterconnectionView，目前判定为各自的
-`kind` 但投影走 interconnection 规则；两者的专有节点/边规则尚未实现。
-
-### 3. 仓格与源码联动 ✅（已完成）
-
-- ✅ **仓格**：`nodes[].compartments`，标题规则与排序对齐官方 `VCompartment`
-  （2026-09-14 修过一次真错：`stereotypeOf` 少了 `AsUsage` 分支、也没处理裸 `Usage`，
-  实测出现 `s` / `succession ases` 这种标题；现在按官方 `getStereotypeName` 的正则实现）
-- ✅ **源码联动（单向）**：`source.snippet` 带原文片段，交互式页面里可显示来源并跳转编辑器
-  （`vscode://file/<path>:<line>`）
-- ❌ **反向联动**：编辑器光标位置驱动图上高亮，需要编辑器宿主（VS Code 扩展或 LSP 客户端）
-- ✅ 仓格里的 `documentation`（doc 文本）已收入，单独成一格（对齐官方
-  `VCompartment.addDocumentation` 把 doc 放在节点下方独立区域的做法）
-
-### 4. 端口方向（新）
-
-互联视图里端口目前只有位置，没有方向。Pilot 的 `VComposite.isPortOut()` 用"是否为连接器
-第一个 owned end feature"判定 `portin` / `portout`（官方注释承认该判据是权宜之计）。
-需要决定我们采用什么判据，并在产物里给端口加方向字段（如 `direction: in/out/inout`）。
-
-更可靠的方向来源是端口特征自身的方向（`in` / `out` / `inout` 有向特征），优先级应高于端序推断。
-
-### 5. 逐视图对照 oracle ✅（已完成）
-
-`scripts/diff-oracle.ps1` + `scripts/oracle_diff.py`：对四个样例视图比较节点名集合与边数量，
-结论与已知差异见 `docs/ORACLE-DIFF.md`。目前四个样例节点名集合全部一致。
-
-后续：**官方差分仍是手动**（12 个视图一轮约 3 分钟）；进 pre-commit 的是产物回归
-（`scripts/check-products.ps1`：期望产物 + schema + 抽样确定性，约 2 分钟）。
-
-## 阶段 3 的支撑项
-
-阶段 3 的正式计划见 `docs/PHASE-3-PLAN.md`。阶段 3 的目标（跨视图查询与追溯）已达成，
-下面这些是它的支撑项或暂缓项——**统一延后**，不阻塞阶段 3 收尾。
+## 当前优先：展示层升级
 
 | 项 | 说明 |
 |---|---|
-| PNG 光栅化依赖浏览器 | `render-png.ps1` 需要本机有 Chrome/Edge；Java 侧不做光栅化（保持引擎与宿主解耦）。若要做成完全自包含的导出，需要引入 SVG 光栅化库 |
-| 布局按视图类型分化 | 现在只有分层树，且**只按包含关系分层，语义边不参与布局**——实测 `samples/structure` 里 typing/specialization 边会横穿整张图。需要按视图类型换布局：General 按类型层级、Interconnection 要正交路由与端口约束、State/Action 要分层流、Sequence 要泳道 |
-| VS Code 扩展（可选） | 反向联动的通道已就绪（`serve-view.ps1` 的 `/cursor`），缺一个把编辑器光标自动发过去的薄客户端 |
-| 大纲树的折叠/展开与搜索 | 大纲已实现，但还不能折叠子树、也不能按键搜索定位 |
-| 手工布局的边界元素独立拖动 | 端口/参数目前跟着所属节点走，不能单独摆位 |
-| 大模型性能 | 已测（`docs/PERF-BASELINE.md`）：瓶颈是官方解析与链接（251 文件 load 232s，约 0.9 s/文件），我们的索引/矩阵只有 94 / 79 ms/文件。真要提速得走增量加载、缓存或复用 JVM |
-| 增量产物 | 现在每次全量生成 |
-| 行为视图专有规则 | Action Flow / State Transition 目前按 interconnection 规则投影；规范符号（控制节点、守卫、trigger/effect）待做 |
-| 快照回归与布局稳定性测试 | ✅ 产物快照回归已做（`tests/golden` + `scripts/check-products.ps1`，已进 pre-commit）；**布局稳定性**还没做（改布局算法后坐标无基线） |
+| 图库框架选型 | **已定：主推 G6 5.1.1，Cytoscape 保留为体积敏感备选**，依据 `docs/GRAPH-LIB-P1.md` |
+| 产物适配层 | P1 原型里有 `adapt()`（`scripts/make-proto-page-p1.py`），待提成正式模块；框架专有字段仍不得进入语义产物 |
+| 框架内布局 | 已验 G6 的 dagre / tree（compact-box、indented）/ combo-combined / d3-force 等；**默认布局仍需按视图类型收敛** |
+| 节点表现 | 端口（原生）、嵌套（combo，含"不能作边端点"的三条适配规则）、仓格（内置 html 节点）均已验证；含仓格的真实视图（`samples/structure`、`samples/parameters`）待扩面 |
+| 交互 | 缩放、拖动、选中、聚焦、筛选、搜索高亮、折叠容器已验证；关系导航与跨视图切换待接 |
+| 动画 | G6 布局过渡与展开收起已可跑；大图默认关动画（221 节点开动画时 `render()` 不结算）。视图切换动画待做 |
+| 导出 | **未做**：框架画布到 SVG/PNG 的稳定导出路径待定（G6 有 `toDataURL`，SVG 出口未验） |
+| 展示层测试 | **未做**：`scripts/measure-proto.py` 已能脚本化跑交互取数，待把阈值断言化并接进提交前检查 |
+| 大图性能 | 已量：221 节点→隐藏隐式后 104/56，G6 建图 89ms、重排 57–60ms、筛选重建 98ms、搜索 35ms、堆 20MB；**默认不整图适配**，先筛选/折叠 |
 
-## 语义与质量待验证项
-
-| 项 | 说明 |
-|---|---|
-| filter 求值失败的语义 | 条件求值不了时，候选是"被排除"还是"标记不确定"，尚未实测。规范倾向后者，我们目前无法区分 |
-| 诊断去重 | 同一个链接错误会被 `Resource.getErrors()` 与 Xtext validator 各报一次，输出正式诊断前需按 code + 位置去重 |
-| 隐式元素的分类边界 | `origin` 现在按"所在资源 + 是否有源码节点"判定，实测出现 Documentation 归为 `library` 的情况，判定规则需要再校 |
-| `getExposedElement()` 顺序的跨平台稳定性 | 已在本机验证两次一致，跨平台未验证 |
-
-## 仓库与流程
+## 语义层仍需补齐
 
 | 项 | 说明 |
 |---|---|
-| 功能分支清理 | `feat/pilot-parser-spike`、`feat/view-product`、`feat/svg-renderer`、`feat/interactive-renderer` 已合并且本地/远端都还在，待统一删除 |
-| ~~pre-commit 未覆盖产物回归~~ | ✅ 已覆盖（2026-09-14）：样例解析校验 + 覆盖率门禁 + **产物回归**（期望产物/schema/抽样确定性）。官方差分与全量语料仍手动 |
-| 没有单元测试框架 | 验证仍靠命令行脚本 + 人工比对；产物回归已脚本化，但没有 JUnit/断言框架，也没有布局与渲染的断言 |
+| Action Flow | 控制节点、守卫和 trigger 尚未实现 |
+| State Transition | 状态节点及 trigger/guard/effect 迁移边尚未实现 |
+| 端口方向 | 从端口特征读取 `in` / `out` / `inout`，必要时才用连接器端序辅助判断 |
+| filter 不确定性 | 条件无法求值时，当前不能区分“排除”与“结果不确定” |
+| 诊断去重 | 相同链接错误可能由资源错误和 Xtext validator 重复报告 |
+| 隐式元素分类 | `origin` 的判定仍需复核，例如 Documentation 可能被归为 `library` |
+| 跨平台确定性 | `getExposedElement()` 顺序目前只在本机验证 |
+
+## 后续优化
+
+| 项 | 说明 |
+|---|---|
+| 编辑器光标客户端 | HTTP `/cursor` 通道已完成，仍缺编辑器侧薄客户端 |
+| 增量产物 | 当前每次全量生成 |
+| 解析性能 | 大模型瓶颈在官方解析与链接；候选方向是缓存、增量加载和复用 JVM |
+| 单元测试 | 目前以脚本回归为主，尚无 JUnit 测试框架 |
+| PNG 环境依赖 | 现有 PNG 导出依赖本机 Chrome 或 Edge |
+
+## 不在当前范围
+
+- 图上修改模型。
+- 将图形操作回写为 `.sysml` 文本。

@@ -9,7 +9,7 @@ import java.util.List;
  * 谁和谁有关系、某个元素出现在哪些视图"。阶段 3 的四个功能——跨视图跳转、局部关系视图、
  * 影响范围分析、追溯矩阵——都建立在它之上。
  *
- * <p>契约见 {@code docs/PHASE-3-PLAN.md} 第 3.1 节。与产物最大的区别：**索引里的身份是
+ * <p>契约见 {@code docs/archive/PHASE-3-PLAN.md} 第 3.1 节。与产物最大的区别：**索引里的身份是
  * `ref`（限定名），不是产物的节点编号**——编号只在单个产物内有效，跨视图追问必须靠限定名。
  */
 public final class WorkspaceIndex {
